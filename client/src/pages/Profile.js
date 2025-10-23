@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api';
 import { useForm } from 'react-hook-form';
 import { 
   User, 
@@ -26,6 +27,7 @@ const Profile = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [schools, setSchools] = useState([]);
 
   const {
     register,
@@ -54,11 +56,25 @@ const Profile = () => {
         address: user.address || '',
         dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
         gender: user.gender || '',
-        avatar: user.avatar || null
+        avatar: user.avatar || null,
+        school: user.school?._id || ''
       });
       setAvatarPreview(user.avatar || null);
     }
   }, [user, reset]);
+
+  useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        // Assuming /api/schools is public or user is authenticated
+        const response = await api.get('/api/schools');
+        setSchools(response.data);
+      } catch (error) {
+        toast.error('Không thể tải danh sách trường.');
+      }
+    };
+    fetchSchools();
+  }, []);
 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
@@ -78,6 +94,21 @@ const Profile = () => {
 
   const onSubmitProfile = async (data) => {
     try {
+      // Handle school change request separately
+      if (user.role === 'student' && data.school && data.school !== user.school?._id) {
+        try {
+          await api.post('/api/change-requests', {
+            requestType: 'change_school',
+            requestedValue: data.school
+          });
+          toast.success('Yêu cầu thay đổi trường đã được gửi đi. Vui lòng chờ quản trị viên phê duyệt.');
+        } catch (requestError) {
+          toast.error(requestError.response?.data?.message || 'Không thể gửi yêu cầu thay đổi trường.');
+        }
+        // Do not include school in the main profile update
+        delete data.school;
+      }
+
       // Prepare data for submission, removing empty gender field
       const submissionData = { ...data };
       if (submissionData.gender === '') {
@@ -288,6 +319,24 @@ const Profile = () => {
                         <option value="other">Khác</option>
                       </select>
                     </div>
+
+                    {user.role === 'student' && (
+                      <div>
+                        <label className="form-label">Trường</label>
+                        <select 
+                          {...register('school')} 
+                          className="input-field"
+                        >
+                          <option value="">Chọn trường</option>
+                          {schools.map(s => (
+                            <option key={s._id} value={s._id}>
+                              {s.schoolName}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">Việc thay đổi trường cần quản trị viên phê duyệt.</p>
+                      </div>
+                    )}
                   </div>
 
                   <div>
