@@ -35,6 +35,7 @@ router.get('/', [auth, admin], async (req, res) => {
 
     const users = await User.find(filter)
       .select('-password')
+      .populate('school', 'schoolName')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -235,7 +236,9 @@ router.get('/students/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('-password');
+    const student = await User.findOne({ _id: req.params.id, role: 'student' })
+      .select('-password')
+      .populate('school', 'schoolName');
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }

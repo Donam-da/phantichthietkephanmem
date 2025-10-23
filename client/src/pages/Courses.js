@@ -13,12 +13,14 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const Courses = () => {
+  const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [semesters, setSemesters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     semester: '',
+    onlyMySchoolCourses: true,
   });
   const [showFilters, setShowFilters] = useState(false);
 
@@ -73,12 +75,18 @@ const Courses = () => {
   };
 
   const filteredCourses = courses.filter(course => {
+    // Filter by school
+    if (filters.onlyMySchoolCourses && user?.role === 'student' && user.school?._id) {
+      if (!course.subject?.schools?.includes(user.school._id)) {
+        return false;
+      }
+    }
+
     const term = searchTerm.toLowerCase();
     return (
       course.subject?.subjectName.toLowerCase().includes(term) ||
       course.subject?.subjectCode.toLowerCase().includes(term) ||
-      course.teacher?.firstName.toLowerCase().includes(term) ||
-      course.teacher?.lastName.toLowerCase().includes(term)
+      (course.teacher?.firstName + " " + course.teacher?.lastName).toLowerCase().includes(term)
     );
   });
 
@@ -137,6 +145,19 @@ const Courses = () => {
                     <option key={sem._id} value={sem._id}>{sem.name} ({sem.academicYear})</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="form-label">Tùy chọn</label>
+                <div className="mt-2 flex items-center">
+                  <input
+                    type="checkbox"
+                    id="onlyMySchoolCourses"
+                    checked={filters.onlyMySchoolCourses}
+                    onChange={(e) => setFilters(prev => ({ ...prev, onlyMySchoolCourses: e.target.checked }))}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <label htmlFor="onlyMySchoolCourses" className="ml-2 block text-sm text-gray-900">Chỉ hiển thị học phần cho trường của tôi</label>
+                </div>
               </div>
             </div>
           )}

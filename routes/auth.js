@@ -117,7 +117,7 @@ router.post('/login', [
         const { email, password } = req.body;
 
         // Check if user exists
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ email }).populate('school');
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
@@ -175,7 +175,7 @@ router.post('/login', [
 // @access  Private
 router.get('/me', auth, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-password');
+        const user = await User.findById(req.user.id).select('-password').populate('school');
         res.json(user);
     } catch (error) {
         console.error('Get user error:', error.message);

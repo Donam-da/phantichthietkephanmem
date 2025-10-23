@@ -183,10 +183,10 @@ const UserManagement = () => {
                       <span className="col-span-2 text-gray-900">{selectedUser.studentId}</span>
                     </div>
                   )}
-                  {selectedUser.major && (
+                  {selectedUser.school && (
                     <div className="grid grid-cols-3 gap-2">
-                      <span className="text-gray-500">Ngành</span>
-                      <span className="col-span-2 text-gray-900">{selectedUser.major}</span>
+                      <span className="text-gray-500">Trường</span>
+                      <span className="col-span-2 text-gray-900">{selectedUser.school.schoolName}</span>
                     </div>
                   )}
                   {(selectedUser.year !== undefined || selectedUser.semester !== undefined) && (

@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   Camera,
+  Book,
   Link as LinkIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -354,6 +355,12 @@ const Profile = () => {
                       <p className="text-gray-900">{getGenderDisplayName(user.gender)}</p>
                     </div>
                   </div>
+                  {user.role === 'student' && (
+                    <div>
+                      <label className="form-label">Trường</label>
+                      <p className="text-gray-900">{user.school?.schoolName || 'Chưa cập nhật'}</p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="form-label">Địa chỉ</label>
@@ -525,8 +532,8 @@ const Profile = () => {
                   <span className="font-medium text-gray-900">{user.studentId || 'Chưa cập nhật'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Ngành học:</span>
-                  <span className="font-medium text-gray-900">{user.major || 'Chưa cập nhật'}</span>
+                  <span className="text-gray-600">Trường:</span>
+                  <span className="font-medium text-gray-900">{user.school?.schoolName || 'Chưa cập nhật'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Năm học:</span>

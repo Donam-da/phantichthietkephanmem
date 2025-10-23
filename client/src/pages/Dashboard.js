@@ -115,7 +115,7 @@ const Dashboard = () => {
           Chào mừng trở lại, {user?.firstName} {user?.lastName}!
         </h1>
         <p className="text-gray-600 mt-2">
-          {getRoleDisplayName(user?.role)} • {user?.major || 'Hệ thống'}
+          {getRoleDisplayName(user?.role)} • {user?.school?.schoolName || 'Hệ thống'}
           {user?.role === 'student' && ` • Năm ${user?.year} • Học kỳ ${user?.semester}`}
         </p>
       </div>
