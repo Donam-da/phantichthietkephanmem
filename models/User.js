@@ -34,27 +34,12 @@ const UserSchema = new mongoose.Schema({
         unique: true,
         sparse: true // Only unique if not null
     },
-    major: {
-        type: String,
+    school: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'School',
         required: function () {
             return this.role === 'student';
         }
-    },
-    year: {
-        type: Number,
-        required: function () {
-            return this.role === 'student';
-        },
-        min: 1,
-        max: 6
-    },
-    semester: {
-        type: Number,
-        required: function () {
-            return this.role === 'student';
-        },
-        min: 1,
-        max: 12
     },
     gpa: {
         type: Number,
@@ -103,7 +88,6 @@ const UserSchema = new mongoose.Schema({
 
 // Index for better query performance
 UserSchema.index({ role: 1 });
-UserSchema.index({ major: 1, year: 1, semester: 1 });
 
 // Hash password before saving
 UserSchema.pre('save', async function (next) {

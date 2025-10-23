@@ -27,7 +27,7 @@ router.post('/', [auth, admin], async (req, res) => {
 // @route   GET api/schools
 // @desc    Lấy tất cả các trường
 // @access  Private
-router.get('/', auth, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const schools = await School.find().sort({ createdAt: -1 });
         res.json(schools);

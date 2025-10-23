@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -19,6 +20,7 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [schools, setSchools] = useState([]);
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
 
@@ -29,7 +31,18 @@ const Register = () => {
     watch
   } = useForm();
 
-  const watchRole = watch('role');
+  useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        const response = await api.get('/api/schools');
+        setSchools(response.data);
+      } catch (error) {
+        toast.error('Không thể tải danh sách trường.');
+      }
+    };
+    fetchSchools();
+  }, []);
+
   const watchPassword = watch('password');
 
   const onSubmit = async (data) => {
@@ -38,9 +51,10 @@ const Register = () => {
       return;
     }
 
+    const submissionData = { ...data, role: 'student' };
     setIsLoading(true);
     try {
-      const result = await registerUser(data);
+      const result = await registerUser(submissionData);
       if (result.success) {
         toast.success('Đăng ký tài khoản thành công!');
         navigate('/dashboard');
@@ -51,15 +65,6 @@ const Register = () => {
       toast.error('Có lỗi xảy ra khi đăng ký');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const getRoleDisplayName = (role) => {
-    switch (role) {
-      case 'student': return 'Sinh viên';
-      case 'teacher': return 'Giảng viên';
-      case 'admin': return 'Quản trị viên';
-      default: return role;
     }
   };
 
@@ -97,26 +102,8 @@ const Register = () => {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
-            {/* Role Selection */}
-            <div>
-              <label className="form-label">Loại tài khoản</label>
-              <select
-                {...register('role', { required: 'Vui lòng chọn loại tài khoản' })}
-                className={`input-field ${errors.role ? 'border-red-500' : ''}`}
-              >
-                <option value="">Chọn loại tài khoản</option>
-                <option value="student">Sinh viên</option>
-                <option value="teacher">Giảng viên</option>
-                <option value="admin">Quản trị viên</option>
-              </select>
-              {errors.role && (
-                <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>
-              )}
-            </div>
-
             {/* Student ID (for students) */}
-            {watchRole === 'student' && (
-              <div>
+            <div>
                 <label className="form-label">Mã sinh viên</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -125,10 +112,10 @@ const Register = () => {
                   <input
                     type="text"
                     {...register('studentId', { 
-                      required: watchRole === 'student' ? 'Mã sinh viên là bắt buộc' : false,
+                      required: 'Mã sinh viên là bắt buộc',
                       pattern: {
-                        value: /^[A-Z0-9]+$/,
-                        message: 'Mã sinh viên chỉ chứa chữ hoa và số'
+                        value: /^\d{8}$/,
+                        message: 'Mã sinh viên phải là 8 chữ số.'
                       }
                     })}
                     className={`input-field pl-10 ${errors.studentId ? 'border-red-500' : ''}`}
@@ -139,40 +126,24 @@ const Register = () => {
                   <p className="mt-1 text-sm text-red-600">{errors.studentId.message}</p>
                 )}
               </div>
-            )}
 
-            {/* Name Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label">Họ và tên đệm</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    {...register('firstName', { required: 'Họ và tên đệm là bắt buộc' })}
-                    className={`input-field pl-10 ${errors.firstName ? 'border-red-500' : ''}`}
-                    placeholder="Nhập họ và tên đệm"
-                  />
+            {/* Full Name Field */}
+            <div>
+              <label className="form-label">Họ và tên</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
                 </div>
-                {errors.firstName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="form-label">Tên</label>
                 <input
                   type="text"
-                  {...register('lastName', { required: 'Tên là bắt buộc' })}
-                  className={`input-field ${errors.lastName ? 'border-red-500' : ''}`}
-                  placeholder="Nhập tên"
+                  {...register('fullName', { required: 'Họ và tên là bắt buộc' })}
+                  className={`input-field pl-10 ${errors.fullName ? 'border-red-500' : ''}`}
+                  placeholder="Nhập họ và tên đầy đủ"
                 />
-                {errors.lastName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
-                )}
               </div>
+              {errors.fullName && (
+                <p className="mt-1 text-sm text-red-600">{errors.fullName.message}</p>
+              )}
             </div>
 
             {/* Email */}
@@ -201,82 +172,28 @@ const Register = () => {
             </div>
 
             {/* Student-specific fields */}
-            {watchRole === 'student' && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="form-label">Ngành học</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <GraduationCap className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <select
-                        {...register('major', { 
-                          required: watchRole === 'student' ? 'Ngành học là bắt buộc' : false 
-                        })}
-                        className={`input-field pl-10 ${errors.major ? 'border-red-500' : ''}`}
-                      >
-                        <option value="">Chọn ngành học</option>
-                        <option value="Công nghệ thông tin">Công nghệ thông tin</option>
-                        <option value="Kỹ thuật điện">Kỹ thuật điện</option>
-                        <option value="Kỹ thuật cơ khí">Kỹ thuật cơ khí</option>
-                        <option value="Kinh tế">Kinh tế</option>
-                        <option value="Ngoại ngữ">Ngoại ngữ</option>
-                        <option value="Sư phạm">Sư phạm</option>
-                      </select>
-                    </div>
-                    {errors.major && (
-                      <p className="mt-1 text-sm text-red-600">{errors.major.message}</p>
-                    )}
+            <>
+              <div>
+                <label className="form-label">Trường</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <GraduationCap className="h-5 w-5 text-gray-400" />
                   </div>
-
-                  <div>
-                    <label className="form-label">Năm học</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Calendar className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <select
-                        {...register('year', { 
-                          required: watchRole === 'student' ? 'Năm học là bắt buộc' : false,
-                          valueAsNumber: true
-                        })}
-                        className={`input-field pl-10 ${errors.year ? 'border-red-500' : ''}`}
-                      >
-                        <option value="">Chọn năm</option>
-                        <option value={1}>Năm 1</option>
-                        <option value={2}>Năm 2</option>
-                        <option value={3}>Năm 3</option>
-                        <option value={4}>Năm 4</option>
-                        <option value={5}>Năm 5</option>
-                      </select>
-                    </div>
-                    {errors.year && (
-                      <p className="mt-1 text-sm text-red-600">{errors.year.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="form-label">Học kỳ</label>
-                    <select
-                      {...register('semester', { 
-                        required: watchRole === 'student' ? 'Học kỳ là bắt buộc' : false,
-                        valueAsNumber: true
-                      })}
-                      className={`input-field ${errors.semester ? 'border-red-500' : ''}`}
-                    >
-                      <option value="">Chọn học kỳ</option>
-                      <option value={1}>Học kỳ 1</option>
-                      <option value={2}>Học kỳ 2</option>
-                      <option value={3}>Học kỳ hè</option>
-                    </select>
-                    {errors.semester && (
-                      <p className="mt-1 text-sm text-red-600">{errors.semester.message}</p>
-                    )}
-                  </div>
+                  <select
+                    {...register('school', { required: 'Vui lòng chọn trường' })}
+                    className={`input-field pl-10 ${errors.school ? 'border-red-500' : ''}`}
+                  >
+                    <option value="">Chọn trường</option>
+                    {schools.map(school => (
+                      <option key={school._id} value={school._id}>{school.schoolName}</option>
+                    ))}
+                  </select>
                 </div>
-              </>
-            )}
+                {errors.school && (
+                  <p className="mt-1 text-sm text-red-600">{errors.school.message}</p>
+                )}
+              </div>
+            </>
 
             {/* Password Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -384,7 +301,7 @@ const Register = () => {
               {isLoading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
-                `Đăng ký tài khoản ${watchRole ? getRoleDisplayName(watchRole).toLowerCase() : ''}`
+                `Đăng ký tài khoản sinh viên`
               )}
             </button>
           </div>

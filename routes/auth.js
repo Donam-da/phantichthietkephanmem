@@ -10,9 +10,8 @@ const router = express.Router();
 // @route   POST /api/auth/register
 // @desc    Register a new user
 // @access  Public
-router.post('/register', [
-    body('firstName', 'First name is required').not().isEmpty(),
-    body('lastName', 'Last name is required').not().isEmpty(),
+router.post('/register', [ 
+    body('fullName', 'Họ và tên là bắt buộc').not().isEmpty(),
     body('email', 'Please include a valid email').isEmail(),
     body('password', 'Password must be at least 6 characters').isLength({ min: 6 }),
     body('role', 'Role is required').isIn(['student', 'teacher', 'admin'])
@@ -24,14 +23,11 @@ router.post('/register', [
         }
 
         const {
-            firstName,
-            lastName,
+            fullName,
             email,
             password,
             role,
-            major,
-            year,
-            semester,
+            school,
             phone,
             address,
             dateOfBirth,
@@ -46,12 +42,15 @@ router.post('/register', [
 
         // Validate student-specific fields
         if (role === 'student') {
-            if (!major || !year || !semester) {
-                return res.status(400).json({
-                    message: 'Major, year, and semester are required for students'
-                });
+            if (!school) {
+                return res.status(400).json({ message: 'Vui lòng chọn trường' });
             }
         }
+
+        // Tách fullName thành firstName và lastName
+        const nameParts = fullName.trim().split(' ');
+        const lastName = nameParts.pop();
+        const firstName = nameParts.join(' ');
 
         // Create new user
         user = new User({
@@ -60,9 +59,7 @@ router.post('/register', [
             email,
             password,
             role,
-            major: role === 'student' ? major : undefined,
-            year: role === 'student' ? year : undefined,
-            semester: role === 'student' ? semester : undefined,
+            school: role === 'student' ? school : undefined,
             phone,
             address,
             dateOfBirth,
