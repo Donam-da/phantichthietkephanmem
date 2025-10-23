@@ -93,41 +93,51 @@ const Profile = () => {
   };
 
   const onSubmitProfile = async (data) => {
-    try {
-      // Handle school change request separately
-      if (user.role === 'student' && data.school && data.school !== user.school?._id) {
-        try {
-          await api.post('/api/change-requests', {
-            requestType: 'change_school',
-            requestedValue: data.school
-          });
-          toast.success('Yêu cầu thay đổi trường đã được gửi đi. Vui lòng chờ quản trị viên phê duyệt.');
-        } catch (requestError) {
-          toast.error(requestError.response?.data?.message || 'Không thể gửi yêu cầu thay đổi trường.');
+    let profileUpdated = false;
+    let schoolChangeRequested = false;
+
+    // 1. Handle school change request
+    if (user.role === 'student' && data.school && data.school !== user.school?._id) {
+      try {
+        await api.post('/api/change-requests', {
+          requestType: 'change_school',
+          requestedValue: data.school
+        });
+        toast.success('Yêu cầu thay đổi trường đã được gửi. Vui lòng chờ phê duyệt.');
+        schoolChangeRequested = true;
+      } catch (requestError) {
+        toast.error(requestError.response?.data?.message || 'Không thể gửi yêu cầu thay đổi trường.');
+        return; // Stop if school change request fails
+      }
+    }
+
+    // 2. Handle general profile update
+    const profileData = { ...data };
+    delete profileData.school; // Always remove school from the main profile update
+
+    if (profileData.gender === '') delete profileData.gender;
+    if (profileData.avatar === user.avatar) delete profileData.avatar;
+
+    // Check if there are any other changes to update
+    const hasProfileChanges = Object.keys(profileData).some(key => profileData[key] !== user[key] && key !== 'avatar');
+
+    if (hasProfileChanges || (data.avatar && data.avatar !== user.avatar)) {
+      try {
+        const result = await updateProfile(profileData);
+        if (result.success) {
+          toast.success('Cập nhật hồ sơ thành công!');
+          profileUpdated = true;
+        } else {
+          toast.error(result.message);
         }
-        // Do not include school in the main profile update
-        delete data.school;
+      } catch (error) {
+        toast.error('Có lỗi xảy ra khi cập nhật hồ sơ.');
       }
+    }
 
-      // Prepare data for submission, removing empty gender field
-      const submissionData = { ...data };
-      if (submissionData.gender === '') {
-        delete submissionData.gender;
-      }
-      // Only include avatar if it has changed
-      if (data.avatar === user.avatar) {
-        delete submissionData.avatar;
-      }
-
-      const result = await updateProfile(submissionData);
-      if (result.success) {
-        toast.success('Cập nhật hồ sơ thành công!');
-        setIsEditing(false);
-      } else {
-        toast.error(result.message);
-      }
-    } catch (error) {
-      toast.error('Có lỗi xảy ra khi cập nhật hồ sơ');
+    // 3. Close edit mode if any action was successful
+    if (profileUpdated || schoolChangeRequested) {
+      setIsEditing(false);
     }
   };
 

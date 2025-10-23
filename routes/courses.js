@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
         const skip = (page - 1) * limit;
 
         const courses = await Course.find(filter)
-            .populate('subject', 'subjectCode subjectName credits')
+            .populate('subject', 'subjectCode subjectName credits schools')
             .populate('teacher', 'firstName lastName email')
             .populate('semester', 'name code academicYear')
             .populate('schedule.classroom', 'roomCode')

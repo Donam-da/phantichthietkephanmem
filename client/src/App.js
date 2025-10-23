@@ -17,7 +17,7 @@ import ManageSchools from './pages/admin/ManageSchools';
 import ManageTeachers from './pages/admin/ManageTeachers'; // Thêm import
 import ManageClassrooms from './pages/admin/ManageClassrooms'; // Thêm import
 import ManageSubjects from './pages/admin/ManageSubjects'; // Thêm import
-import ChangeRequestManagement from './pages/ChangeRequestManagement'; // Thêm import
+import AdminRequests from './pages/AdminRequests'; // Đổi tên và đường dẫn
 import SemesterManagement from './pages/SemesterManagement';
 import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherCourses from './pages/TeacherCourses';
@@ -87,7 +87,7 @@ const AppRoutes = () => {
         <Route path="admin/teachers" element={<AdminRoute><ManageTeachers /></AdminRoute>} />
         <Route path="admin/subjects" element={<AdminRoute><ManageSubjects /></AdminRoute>} />
         <Route path="admin/classrooms" element={<AdminRoute><ManageClassrooms /></AdminRoute>} />
-        <Route path="admin/requests" element={<AdminRoute><ChangeRequestManagement /></AdminRoute>} />
+        <Route path="admin/requests" element={<AdminRoute><AdminRequests /></AdminRoute>} />
         <Route path="admin/semesters" element={<AdminRoute><SemesterManagement /></AdminRoute>} />
       </Route>
 

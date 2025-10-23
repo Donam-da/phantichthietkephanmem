@@ -27,7 +27,7 @@ router.post('/', [
     const { requestedValue } = req.body;
 
     try {
-        const student = await User.findById(req.user.id);
+        const student = await User.findById(req.user.id).populate('school');
 
         // Check for existing pending request
         const existingRequest = await ChangeRequest.findOne({
@@ -40,14 +40,14 @@ router.post('/', [
             return res.status(400).json({ message: 'Bạn đã có một yêu cầu thay đổi trường đang chờ xử lý.' });
         }
 
-        if (student.school.toString() === requestedValue) {
+        if (student.school?._id.toString() === requestedValue) {
             return res.status(400).json({ message: 'Bạn đã ở trường này rồi.' });
         }
 
         const newRequest = new ChangeRequest({
             user: req.user.id,
             requestType: 'change_school',
-            currentValue: student.school,
+            currentValue: student.school._id,
             requestedValue: requestedValue,
         });
 
@@ -66,7 +66,7 @@ router.post('/', [
 router.get('/', [auth, admin], async (req, res) => {
     try {
         const requests = await ChangeRequest.find()
-            .populate('user', 'fullName studentId email')
+            .populate('user', 'firstName lastName studentId email')
             .populate('currentValue', 'schoolName') // Assuming currentValue is an ID for a School
             .populate('requestedValue', 'schoolName') // Assuming requestedValue is an ID for a School
             .sort({ createdAt: -1 });

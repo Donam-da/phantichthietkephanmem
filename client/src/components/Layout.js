@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Header from './Header'; // Import Header mới
 import {
   Home,
   BookOpen,
@@ -9,7 +10,6 @@ import {
   Settings,
   Users,
   Calendar,
-  LogOut,
   Menu,
   X,
   Building, // Thêm icon Building
@@ -23,11 +23,6 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home, show: !isTeacher },
@@ -196,7 +191,7 @@ const Layout = () => {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 justify-between lg:justify-end">
           <button
             type="button"
             className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
@@ -204,33 +199,7 @@ const Layout = () => {
           >
             <Menu className="h-6 w-6" />
           </button>
-
-          <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <div className="flex flex-1"></div>
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
-              {/* User menu */}
-              <div className="flex items-center gap-x-4">
-                <Link to="/profile" className="flex items-center gap-x-3 hover:bg-gray-100 p-2 rounded-md">
-                  <img
-                    className="h-8 w-8 rounded-full bg-gray-50 object-cover"
-                    src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=random`}
-                    alt="Avatar"
-                  />
-                  <div className="text-sm">
-                    <p className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
-                    <p className="text-gray-500">{user?.role === 'student' ? 'Sinh viên' : user?.role === 'teacher' ? 'Giảng viên' : 'Quản trị viên'}</p>
-                  </div>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-x-2 text-sm text-gray-700 hover:text-gray-900"
-                >
-                  <LogOut className="h-5 w-5" />
-                  Đăng xuất
-                </button>
-              </div>
-            </div>
-          </div>
+          <Header />
         </div>
 
         {/* Page content */}
