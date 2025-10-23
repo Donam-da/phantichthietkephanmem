@@ -469,8 +469,8 @@ const CourseManagement = () => {
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setHoveredCourseId(null)}
             >
-              <Link to={`/teacher/courses/${course._id}`} className="flex-1 flex items-center justify-between group">
-                <div className="flex-1 pr-4 flex items-center gap-3">
+              <Link to={`/teacher/courses/${course._id}`} className="w-full flex items-center justify-between group">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   {isTeacher && (
                     course.teacher?._id === user.id ? (
                       <Star className="h-5 w-5 text-yellow-400 fill-current flex-shrink-0" />
@@ -478,15 +478,17 @@ const CourseManagement = () => {
                       <div className="h-5 w-5 flex-shrink-0" />
                     )
                   )}
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-base font-medium text-indigo-600 truncate group-hover:underline">{course.subject?.subjectName} ({course.subject?.subjectCode})</p>
                     <p className="text-sm text-gray-500">Mã lớp: {course.classCode}</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4 ml-4">
-                  <span className="text-sm text-gray-700">{course.currentStudents}/{course.maxStudents} SV</span>
+                <div className="flex items-center space-x-6 ml-4 flex-shrink-0">
+                  <div className="w-24 text-right">
+                    <span className="text-sm text-gray-700">{course.currentStudents}/{course.maxStudents} SV</span>
+                  </div>
                   {!isTeacher && (
-                    <div className="flex flex-col items-end space-y-1">
+                    <div className="w-20 flex flex-col items-end space-y-1">
                         <button onClick={(e) => { e.preventDefault(); handleEdit(course); }} className="text-blue-600 hover:text-blue-900 text-sm font-medium">Chỉnh sửa</button>
                         <button onClick={(e) => { e.preventDefault(); handleDelete(course._id); }} className="text-red-600 hover:text-red-900 text-sm font-medium">Xóa</button>
                     </div>
