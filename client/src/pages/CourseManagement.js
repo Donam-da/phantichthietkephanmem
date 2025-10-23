@@ -67,18 +67,15 @@ const CourseManagement = () => {
     fetchStaticData();
   }, [isTeacher]);
 
-  // Fetch courses whenever the semester filter changes
-  useEffect(() => {
-    if (!filters.semester) return; // Don't fetch if no semester is selected
-
-    const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
+    if (!filters.semester) return;
     try {
       setLoading(true);
       const params = new URLSearchParams();
       params.append('semester', filters.semester);
       const courseApiUrl = `/api/courses?${params.toString()}`;
       const coursesRes = await api.get(courseApiUrl);
-      
+
       let fetchedCourses = coursesRes.data.courses;
 
       // If the user is a teacher, sort their courses to the top
@@ -97,10 +94,17 @@ const CourseManagement = () => {
     } finally {
       setLoading(false);
     }
-    };
-    fetchCourses();
   }, [filters.semester, isTeacher, user]);
 
+  // Fetch courses whenever the semester filter changes
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  const triggerRefetch = () => {
+    setCourses([]); // Clear current courses to show loading state
+    fetchCourses();
+  };
   const handleFilterChange = (e) => {
     setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -217,8 +221,7 @@ const CourseManagement = () => {
         toast.success('Tạo lớp học phần thành công');
       }
       resetForm();
-      // Refetch courses for the current semester
-      setFilters(prev => ({...prev})); // This will trigger the fetch effect
+      triggerRefetch();
     } catch (error) {
       toast.error(error.response?.data?.msg || 'Lỗi khi lưu lớp học phần');
     }
@@ -247,7 +250,7 @@ const CourseManagement = () => {
         await api.delete(`/api/courses/${courseId}`);
         toast.success('Xóa lớp học phần thành công');
         // Refetch courses
-        setFilters(prev => ({...prev}));
+        triggerRefetch();
       } catch (error) {
         toast.error(error.response?.data?.msg || 'Lỗi khi xóa lớp học phần');
       }

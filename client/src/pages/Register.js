@@ -110,7 +110,9 @@ const Register = () => {
                     <Hash className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
-                    type="text"
+                    type="tel"
+                    maxLength="8"
+                    pattern="\d{8}"
                     {...register('studentId', { 
                       required: 'Mã sinh viên là bắt buộc',
                       pattern: {
