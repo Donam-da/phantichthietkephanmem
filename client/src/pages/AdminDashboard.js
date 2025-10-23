@@ -25,7 +25,8 @@ const AdminDashboard = () => {
     totalRegistrations: 0,
     pendingRegistrations: 0,
     approvedRegistrations: 0,
-    activeSemesters: 0
+    activeSemesters: 0,
+    pendingChangeRequests: 0,
   });
   const [recentRegistrations, setRecentRegistrations] = useState([]);
   const [recentUsers, setRecentUsers] = useState([]);
@@ -40,17 +41,19 @@ const AdminDashboard = () => {
       setLoading(true);
       
       // Fetch all data in parallel
-      const [usersRes, coursesRes, registrationsRes, semestersRes] = await Promise.all([
+      const [usersRes, coursesRes, registrationsRes, semestersRes, changeRequestsRes] = await Promise.all([
         api.get('/api/users'),
         api.get('/api/courses'),
         api.get('/api/registrations'),
-        api.get('/api/semesters')
+        api.get('/api/semesters'),
+        api.get('/api/change-requests'),
       ]);
 
       const users = usersRes.data.users;
       const courses = coursesRes.data.courses;
       const registrations = registrationsRes.data.registrations;
       const semesters = semestersRes.data;
+      const changeRequests = changeRequestsRes.data;
 
       // Calculate stats
       const totalStudents = users.filter(u => u.role === 'student').length;
@@ -58,6 +61,7 @@ const AdminDashboard = () => {
       const pendingRegistrations = registrations.filter(r => r.status === 'pending').length;
       const approvedRegistrations = registrations.filter(r => r.status === 'approved').length;
       const activeSemesters = semesters.filter(s => s.isActive).length;
+      const pendingChangeRequests = changeRequests.filter(r => r.status === 'pending').length;
 
       setStats({
         totalUsers: users.length,
@@ -67,7 +71,8 @@ const AdminDashboard = () => {
         totalRegistrations: registrations.length,
         pendingRegistrations,
         approvedRegistrations,
-        activeSemesters
+        activeSemesters,
+        pendingChangeRequests,
       });
 
       // Set recent data

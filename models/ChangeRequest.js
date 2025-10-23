@@ -12,11 +12,13 @@ const ChangeRequestSchema = new mongoose.Schema({
         required: true
     },
     currentValue: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'School',
         required: true
     },
     requestedValue: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'School',
         required: true
     },
     status: {
