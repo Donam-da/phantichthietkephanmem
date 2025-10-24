@@ -41,6 +41,16 @@ const UserSchema = new mongoose.Schema({
             return this.role === 'student';
         }
     },
+    year: {
+        type: Number,
+        required: function() { return this.role === 'student'; },
+        min: 1
+    },
+    semester: {
+        type: Number,
+        required: function() { return this.role === 'student'; },
+        min: 1
+    },
     gpa: {
         type: Number,
         default: 0,

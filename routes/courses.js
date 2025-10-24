@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
         const courses = await Course.find(filter)
             .populate('subject', 'subjectCode subjectName credits schools')
             .populate('teacher', 'firstName lastName email')
-            .populate('semester', 'name code academicYear')
+            .populate('semester', 'name code academicYear startDate endDate')
             .populate('schedule.classroom', 'roomCode')
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -159,20 +159,33 @@ router.put('/:id', [auth, admin], async (req, res) => {
 // @access  Private (Admin only)
 router.delete('/:id', [auth, admin], async (req, res) => {
     try {
-        const course = await Course.findById(req.params.id);
+        const course = await Course.findById(req.params.id).populate('subject', 'credits');
         if (!course) {
             return res.status(404).json({ msg: 'Không tìm thấy lớp học phần' });
         }
 
-        // Check if course has any registrations
+        // Find all registrations for this course
         const Registration = require('../models/Registration');
-        const registrationCount = await Registration.countDocuments({ course: req.params.id });
-        if (registrationCount > 0) {
-            return res.status(400).json({ msg: 'Không thể xóa lớp đã có sinh viên đăng ký.' });
+        const User = require('../models/User');
+        const registrations = await Registration.find({ course: req.params.id });
+
+        // Adjust credits for students whose registration was approved
+        const approvedRegistrations = registrations.filter(r => r.status === 'approved');
+        if (approvedRegistrations.length > 0) {
+            const creditsToDecrement = course.subject.credits || 0;
+            const studentIds = approvedRegistrations.map(r => r.student);
+            await User.updateMany(
+                { _id: { $in: studentIds } },
+                { $inc: { currentCredits: -creditsToDecrement } }
+            );
         }
 
+        // Update status of all registrations to 'cancelled'
+        await Registration.updateMany({ course: req.params.id }, { $set: { status: 'cancelled' } });
+
+        // Now, delete the course itself
         await Course.findByIdAndDelete(req.params.id);
-        res.json({ msg: 'Lớp học phần đã được xóa' });
+        res.json({ msg: 'Lớp học phần đã được xóa và các đăng ký liên quan đã được cập nhật.' });
     } catch (error) {
         console.error(error.message);
         if (error.kind === 'ObjectId') {

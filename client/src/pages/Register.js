@@ -20,7 +20,6 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [schools, setSchools] = useState([]);
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
 
@@ -32,16 +31,17 @@ const Register = () => {
   } = useForm();
 
   useEffect(() => {
-    const fetchSchools = async () => {
+    // This page doesn't need school selection anymore, but keeping the structure
+    // in case other dropdowns are needed in the future.
+    const fetchInitialData = async () => {
       try {
-        const response = await api.get('/api/schools');
-        setSchools(response.data);
+        // Example: const response = await api.get('/api/some-data');
       } catch (error) {
-        toast.error('Không thể tải danh sách trường.');
+        // toast.error('Could not load initial data.');
       }
     };
-    fetchSchools();
-  }, []);
+    fetchInitialData();
+  }, []); 
 
   const watchPassword = watch('password');
 
@@ -172,31 +172,6 @@ const Register = () => {
                 <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
               )}
             </div>
-
-            {/* Student-specific fields */}
-            <>
-              <div>
-                <label className="form-label">Trường</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <GraduationCap className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <select
-                    {...register('school', { required: 'Vui lòng chọn trường' })}
-                    className={`input-field pl-10 ${errors.school ? 'border-red-500' : ''}`}
-                  >
-                    <option value="">Chọn trường</option>
-                    {schools.map(school => (
-                      <option key={school._id} value={school._id}>{school.schoolName}</option>
-                    ))}
-                  </select>
-                </div>
-                {errors.school && (
-                  <p className="mt-1 text-sm text-red-600">{errors.school.message}</p>
-                )}
-              </div>
-            </>
-
             {/* Password Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

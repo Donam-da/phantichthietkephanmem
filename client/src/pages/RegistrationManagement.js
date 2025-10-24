@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { Eye } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const RegistrationManagement = () => {
-  const { user } = useAuth();
+  const { user, isTeacher } = useAuth();
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [hoveredRegistrationId, setHoveredRegistrationId] = useState(null);
+  const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
+  const [showOnlyMyCourses, setShowOnlyMyCourses] = useState(true);
 
   useEffect(() => {
     fetchRegistrations();
@@ -29,23 +33,29 @@ const RegistrationManagement = () => {
     try {
       await api.put(`/api/registrations/${registrationId}/approve`);
       toast.success('Phê duyệt đăng ký thành công');
-      fetchRegistrations();
+      window.location.reload();
     } catch (error) {
       toast.error('Lỗi khi phê duyệt đăng ký');
     }
   };
 
-  const handleReject = async (registrationId) => {
-    const reason = window.prompt('Nhập lý do từ chối:');
+  const handleReject = async (registration) => {
+    const registrationId = registration._id;
+    const suggestedReason = registration.rejectionRequest?.reason || '';
+    const reason = window.prompt('Nhập lý do từ chối:', suggestedReason);
     if (reason) {
       try {
         await api.put(`/api/registrations/${registrationId}/reject`, { reason });
         toast.success('Từ chối đăng ký thành công');
-        fetchRegistrations();
+        window.location.reload();
       } catch (error) {
         toast.error('Lỗi khi từ chối đăng ký');
       }
     }
+  };
+
+  const handleMouseMove = (e) => {
+    setPopoverPosition({ x: e.clientX, y: e.clientY });
   };
 
   const getStatusColor = (status) => {
@@ -88,7 +98,12 @@ const RegistrationManagement = () => {
                          registration.course?.courseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          registration.course?.courseCode?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !statusFilter || registration.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    let matchesTeacher = true;
+    if (isTeacher && showOnlyMyCourses) {
+      matchesTeacher = registration.course?.teacher?._id === user.id;
+    }
+    return matchesSearch && matchesStatus && matchesTeacher;
   });
 
   if (loading) {
@@ -124,13 +139,32 @@ const RegistrationManagement = () => {
             <option value="dropped">Đã hủy</option>
             <option value="completed">Hoàn thành</option>
           </select>
+          {isTeacher && (
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="showOnlyMyCourses"
+                checked={showOnlyMyCourses}
+                onChange={(e) => setShowOnlyMyCourses(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="showOnlyMyCourses" className="ml-2 block text-sm text-gray-900">
+                Chỉ hiển thị lớp của tôi
+              </label>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
           {filteredRegistrations.map((registration) => (
-            <li key={registration._id} className="px-6 py-4">
+            <li 
+              key={registration._id}
+              className="px-6 py-4"
+              onMouseEnter={() => setHoveredRegistrationId(registration._id)}
+              onMouseLeave={() => setHoveredRegistrationId(null)}
+              onMouseMove={handleMouseMove}>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
@@ -138,10 +172,10 @@ const RegistrationManagement = () => {
                       <h3 className="text-lg font-medium text-gray-900">
                         {registration.student?.firstName} {registration.student?.lastName}
                       </h3>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 mt-1">
                         MSSV: {registration.student?.studentId}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 mt-1">
                         Khóa học: {registration.course?.courseCode} - {registration.course?.courseName}
                       </p>
                       <p className="text-sm text-gray-500">
@@ -150,6 +184,11 @@ const RegistrationManagement = () => {
                       <p className="text-sm text-gray-500">
                         Ngày đăng ký: {new Date(registration.registrationDate).toLocaleDateString('vi-VN')}
                       </p>
+                      {registration.status === 'pending' && registration.rejectionRequest?.requested && (
+                        <div className="mt-2 p-2 bg-orange-50 border-l-4 border-orange-400 text-orange-700 text-sm">
+                          <strong>GV đề nghị từ chối:</strong> {registration.rejectionRequest.reason}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(registration.status)}`}>
@@ -159,7 +198,7 @@ const RegistrationManagement = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2 ml-4">
-                  {registration.status === 'pending' && (
+                  {registration.status === 'pending' && (!isTeacher || registration.course?.teacher?._id === user.id) && (
                     <>
                       <button
                         onClick={() => handleApprove(registration._id)}
@@ -168,7 +207,7 @@ const RegistrationManagement = () => {
                         Phê duyệt
                       </button>
                       <button
-                        onClick={() => handleReject(registration._id)}
+                        onClick={() => handleReject(registration)}
                         className="text-red-600 hover:text-red-900 text-sm font-medium"
                       >
                         Từ chối
@@ -181,6 +220,39 @@ const RegistrationManagement = () => {
           ))}
         </ul>
       </div>
+
+      {/* Hover Popover */}
+      {hoveredRegistrationId && (() => {
+          const registration = registrations.find(r => r._id === hoveredRegistrationId);
+          if (!registration) return null;
+
+          return (
+              <div
+                  className="fixed w-80 bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-50 pointer-events-none"
+                  style={{
+                      top: `${popoverPosition.y + 20}px`,
+                      left: `${popoverPosition.x + 20}px`,
+                      transform: 'translate(-50%, 0)', // Center horizontally on cursor
+                  }}
+              >
+                  <h4 className="font-bold text-gray-800">Chi tiết Đăng ký</h4>
+                  <p className="text-sm text-gray-500 border-b pb-2 mb-2">
+                      {registration.course?.subject?.subjectName} - {registration.course?.classCode}
+                  </p>
+                  <div className="space-y-1 text-sm">
+                      <p><span className="font-semibold">Sinh viên:</span> {registration.student?.firstName} {registration.student?.lastName}</p>
+                      <p><span className="font-semibold">Mã SV:</span> {registration.student?.studentId}</p>
+                      <p><span className="font-semibold">Trạng thái:</span> {getStatusText(registration.status)}</p>
+                      <p><span className="font-semibold">Ngày ĐK:</span> {new Date(registration.registrationDate).toLocaleString('vi-VN')}</p>
+                      {registration.status === 'approved' && registration.approvedBy && (
+                          <p><span className="font-semibold">Người duyệt:</span> {registration.approvedBy.firstName} {registration.approvedBy.lastName}</p>
+                      )}
+                      {registration.rejectionReason && <p><span className="font-semibold">Lý do từ chối:</span> {registration.rejectionReason}</p>}
+                      {registration.rejectionRequest?.requested && <p><span className="font-semibold">GV đề nghị từ chối:</span> {registration.rejectionRequest.reason}</p>}
+                  </div>
+              </div>
+          );
+      })()}
     </div>
   );
 };

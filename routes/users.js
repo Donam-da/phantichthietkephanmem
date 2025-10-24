@@ -133,7 +133,7 @@ router.put('/profile', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { firstName, lastName, email, phone, address, dateOfBirth, gender, avatar } = req.body;
+    const { firstName, lastName, email, phone, address, dateOfBirth, gender, avatar, year, semester } = req.body;
 
     // Check if email is already taken by another user
     const existingUser = await User.findOne({ email, _id: { $ne: req.user.id } });
@@ -149,14 +149,17 @@ router.put('/profile', [
       address,
       dateOfBirth,
       gender,
+      year,
+      semester
     };
     if (avatar) updateData.avatar = avatar;
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
       updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
+      { new: true, runValidators: true, context: 'query' }
+    ).select('-password')
+     .populate('school');
 
     res.json(user);
   } catch (error) {

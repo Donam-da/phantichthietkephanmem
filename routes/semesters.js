@@ -34,14 +34,26 @@ router.get('/', async (req, res) => {
 router.get('/current', async (req, res) => {
   try {
     const now = new Date();
-    // Always return the active, current semester if it exists
-    const currentSemester = await Semester.findOne({
+    let currentSemester;
+
+    // 1. Try to find a semester currently open for registration
+    currentSemester = await Semester.findOne({
       isActive: true,
-      isCurrent: true
-    });
+      registrationStartDate: { $lte: now },
+      registrationEndDate: { $gte: now }
+    }).sort({ startDate: 1 });
+
+    // 2. If none, find the semester currently in session
+    if (!currentSemester) {
+      currentSemester = await Semester.findOne({
+        isActive: true,
+        startDate: { $lte: now },
+        endDate: { $gte: now }
+      });
+    }
 
     if (!currentSemester) {
-      return res.status(404).json({ message: 'No current semester found' });
+      return res.status(404).json({ message: 'Không tìm thấy học kỳ nào đang hoạt động.' });
     }
 
     const json = currentSemester.toJSON();

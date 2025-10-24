@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Calendar, Users, User, Mail, Hash, Check, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Calendar, Users, User, Mail, Hash, Check, X, Clock } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -10,6 +10,8 @@ const TeacherCourseDetail = () => {
     const [registrations, setRegistrations] = useState([]);
     const [filteredRegistrations, setFilteredRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [hoveredRegistrationId, setHoveredRegistrationId] = useState(null);
+    const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
     const [statusFilter, setStatusFilter] = useState('all');
 
     const fetchCourseDetails = useCallback(async () => {
@@ -66,24 +68,31 @@ const TeacherCourseDetail = () => {
         try {
             await api.put(`/api/registrations/${registrationId}/approve`);
             toast.success('Phê duyệt đăng ký thành công');
-            fetchCourseDetails(); // Refresh data
+            window.location.reload();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Lỗi khi phê duyệt');
         }
     };
 
     const handleReject = async (registrationId) => {
-        const reason = window.prompt('Nhập lý do từ chối (tùy chọn):');
-        // Allow empty reason
+        const reason = window.prompt('Vui lòng nhập lý do từ chối để gửi cho quản trị viên xem xét:');
+        if (!reason) {
+            toast.error('Bạn phải cung cấp lý do từ chối.');
+            return;
+        }
         if (reason !== null) {
             try {
                 await api.put(`/api/registrations/${registrationId}/reject`, { reason: reason || 'Không có lý do' });
                 toast.success('Từ chối đăng ký thành công');
-                fetchCourseDetails(); // Refresh data
+                window.location.reload();
             } catch (error) {
                 toast.error(error.response?.data?.message || 'Lỗi khi từ chối');
             }
         }
+    };
+
+    const handleMouseMove = (e) => {
+        setPopoverPosition({ x: e.clientX, y: e.clientY });
     };
 
     if (loading) {
@@ -158,38 +167,50 @@ const TeacherCourseDetail = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredRegistrations.map(({ _id, student, status }) => (
-                                    <tr key={_id}>
+                                {filteredRegistrations.map((registration) => (
+                                    <tr 
+                                      key={registration._id}
+                                      onMouseEnter={() => setHoveredRegistrationId(registration._id)}
+                                      onMouseLeave={() => setHoveredRegistrationId(null)}
+                                      onMouseMove={handleMouseMove}
+                                    >
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <Hash className="h-4 w-4 text-gray-400 mr-2" />
-                                                <div className="text-sm text-gray-900">{student?.studentId || 'N/A'}</div>
+                                                <div className="text-sm text-gray-900">{registration.student?.studentId || 'N/A'}</div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <User className="h-4 w-4 text-gray-400 mr-2" />
-                                                <div className="text-sm font-medium text-gray-900">{student?.firstName} {student?.lastName}</div>
+                                                <div className="text-sm font-medium text-gray-900">{registration.student?.firstName} {registration.student?.lastName}</div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                                <Mail className="h-4 w-4 text-gray-400 mr-2" />
-                                                <div className="text-sm text-gray-500">{student?.email}</div>
+                                            <div>
+                                                <div className="flex items-center">
+                                                    <Mail className="h-4 w-4 text-gray-400 mr-2" />
+                                                    <div className="text-sm text-gray-500">{registration.student?.email}</div>
+                                                </div>
+                                                {registration.status === 'pending' && registration.rejectionRequest?.requested && (
+                                                <div className="mt-2 text-xs text-orange-600 p-2 bg-orange-50 rounded-md">
+                                                    <strong>GV đề nghị từ chối:</strong> {registration.rejectionRequest.reason}
+                                                </div>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(status)}`}>
-                                                {getStatusDisplayName(status)}
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(registration.status)}`}>
+                                                {getStatusDisplayName(registration.status)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                            {status === 'pending' && (
+                                            {registration.status === 'pending' && !registration.rejectionRequest?.requested && (
                                                 <div className="flex justify-center items-center gap-4">
-                                                    <button onClick={() => handleApprove(_id)} className="text-green-600 hover:text-green-900" title="Duyệt">
+                                                     <button onClick={() => handleApprove(registration._id)} className="text-green-600 hover:text-green-900" title="Duyệt">
                                                         <Check className="h-5 w-5" />
                                                     </button>
-                                                    <button onClick={() => handleReject(_id)} className="text-red-600 hover:text-red-900" title="Từ chối">
+                                                     <button onClick={() => handleReject(registration._id)} className="text-red-600 hover:text-red-900" title="Từ chối">
                                                         <X className="h-5 w-5" />
                                                     </button>
                                                 </div>
@@ -200,16 +221,57 @@ const TeacherCourseDetail = () => {
                             </tbody>
                         </table>
                     ) : (
-                        <div className="text-center py-12">
-                            <Users className="mx-auto h-12 w-12 text-gray-400" />
-                            <h3 className="mt-2 text-sm font-medium text-gray-900">Chưa có sinh viên</h3>
-                            <p className="mt-1 text-sm text-gray-500">
-                                Hiện chưa có sinh viên nào đăng ký khóa học này.
-                            </p>
-                        </div>
+                        course?.semester?.registrationEndDate && new Date() < new Date(course.semester.registrationEndDate) ? (
+                            <div className="text-center py-12">
+                                <Clock className="mx-auto h-12 w-12 text-blue-400" />
+                                <h3 className="mt-2 text-sm font-medium text-gray-900">Thời gian đăng ký chưa kết thúc</h3>
+                                <p className="mt-1 text-sm text-gray-500">
+                                    Danh sách sinh viên sẽ được hiển thị sau ngày {new Date(course.semester.registrationEndDate).toLocaleDateString('vi-VN')}.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <Users className="mx-auto h-12 w-12 text-gray-400" />
+                                <h3 className="mt-2 text-sm font-medium text-gray-900">Chưa có sinh viên</h3>
+                                <p className="mt-1 text-sm text-gray-500">Hiện chưa có sinh viên nào đăng ký khóa học này.</p>
+                            </div>
+                        )
                     )}
                 </div>
             </div>
+
+            {/* Hover Popover */}
+            {hoveredRegistrationId && (() => {
+                const registration = registrations.find(r => r._id === hoveredRegistrationId);
+                if (!registration) return null;
+
+                return (
+                    <div
+                        className="fixed w-80 bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-50 pointer-events-none"
+                        style={{
+                            top: `${popoverPosition.y + 20}px`,
+                            left: `${popoverPosition.x + 20}px`,
+                            transform: 'translate(-50%, 0)', // Center horizontally on cursor
+                        }}
+                    >
+                        <h4 className="font-bold text-gray-800">Chi tiết Đăng ký</h4>
+                        <p className="text-sm text-gray-500 border-b pb-2 mb-2">
+                            {registration.course?.subject?.subjectName} - {registration.course?.classCode}
+                        </p>
+                        <div className="space-y-1 text-sm">
+                            <p><span className="font-semibold">Sinh viên:</span> {registration.student?.firstName} {registration.student?.lastName}</p>
+                            <p><span className="font-semibold">Mã SV:</span> {registration.student?.studentId}</p>
+                            <p><span className="font-semibold">Trạng thái:</span> {getStatusDisplayName(registration.status)}</p>
+                            <p><span className="font-semibold">Ngày ĐK:</span> {new Date(registration.registrationDate).toLocaleString('vi-VN')}</p>
+                            {registration.status === 'approved' && registration.approvedBy && (
+                                <p><span className="font-semibold">Người duyệt:</span> {registration.approvedBy.firstName} {registration.approvedBy.lastName}</p>
+                            )}
+                            {registration.rejectionReason && <p><span className="font-semibold">Lý do từ chối:</span> {registration.rejectionReason}</p>}
+                            {registration.rejectionRequest?.requested && <p><span className="font-semibold">GV đề nghị từ chối:</span> {registration.rejectionRequest.reason}</p>}
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 };

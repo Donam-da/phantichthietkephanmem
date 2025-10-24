@@ -28,6 +28,7 @@ const Profile = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [schools, setSchools] = useState([]);
+  const [activeSemesters, setActiveSemesters] = useState([]);
 
   const {
     register,
@@ -57,23 +58,28 @@ const Profile = () => {
         dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
         gender: user.gender || '',
         avatar: user.avatar || null,
-        school: user.school?._id || ''
+        school: user.school?._id || '',
+        year: user.year || '',
+        semester: user.semester || ''
       });
       setAvatarPreview(user.avatar || null);
     }
   }, [user, reset]);
 
   useEffect(() => {
-    const fetchSchools = async () => {
+    const fetchDropdownData = async () => {
       try {
-        // Assuming /api/schools is public or user is authenticated
-        const response = await api.get('/api/schools');
-        setSchools(response.data);
+        const [schoolsRes, semestersRes] = await Promise.all([
+          api.get('/api/schools'),
+          api.get('/api/semesters?isActive=true')
+        ]);
+        setSchools(schoolsRes.data);
+        setActiveSemesters(semestersRes.data);
       } catch (error) {
-        toast.error('Không thể tải danh sách trường.');
+        toast.error('Không thể tải dữ liệu cho các mục lựa chọn.');
       }
     };
-    fetchSchools();
+    fetchDropdownData();
   }, []);
 
   const handleAvatarChange = (e) => {
@@ -346,6 +352,29 @@ const Profile = () => {
                         </select>
                         <p className="mt-1 text-xs text-gray-500">Việc thay đổi trường cần quản trị viên phê duyệt.</p>
                       </div>
+                    )}
+
+                    {user.role === 'student' && (
+                      <>
+                        <div>
+                          <label className="form-label">Năm học</label>
+                          <select {...register('year', { valueAsNumber: true })} className="input-field">
+                            <option value="">Chọn năm học</option>
+                            {[1, 2, 3, 4, 5].map(y => (
+                              <option key={y} value={y}>Năm {y}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="form-label">Học kỳ</label>
+                          <select {...register('semester', { valueAsNumber: true })} className="input-field">
+                            <option value="">Chọn học kỳ</option>
+                            {activeSemesters.map(s => (
+                              <option key={s._id} value={s.semesterNumber}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
                     )}
                   </div>
 

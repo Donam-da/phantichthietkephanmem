@@ -9,7 +9,7 @@ import {
   User,
   AlertCircle,
   CheckCircle,
-  XCircle,
+  XCircle,  
   Eye,
   Download,
   Trash2
@@ -46,12 +46,12 @@ const MyRegistrations = () => {
     }
 
     try {
-      await api.put(`/api/registrations/${registrationId}/drop`);
+      await api.delete(`/api/registrations/${registrationId}`); // This call is now correct
       toast.success('Đã xóa khóa học thành công!');
-      fetchRegistrations(); // Refresh list
+      window.location.reload(); // Reload the page to ensure UI is updated
     } catch (error) {
       console.error('Error dropping course:', error);
-      toast.error('Không thể xóa khóa học');
+      toast.error(error.response?.data?.message || 'Không thể xóa khóa học');
     }
   };
 
@@ -62,6 +62,7 @@ const MyRegistrations = () => {
       case 'rejected': return 'text-red-600 bg-red-100';
       case 'dropped': return 'text-gray-600 bg-gray-100';
       case 'completed': return 'text-blue-600 bg-blue-100';
+      case 'cancelled': return 'text-gray-600 bg-gray-200';
       default: return 'text-gray-600 bg-gray-100';
     }
   };
@@ -73,6 +74,7 @@ const MyRegistrations = () => {
       case 'rejected': return 'Từ chối';
       case 'dropped': return 'Đã xóa';
       case 'completed': return 'Hoàn thành';
+      case 'cancelled': return 'Lớp bị hủy';
       default: return status;
     }
   };
@@ -84,6 +86,7 @@ const MyRegistrations = () => {
       case 'rejected': return <XCircle className="h-5 w-5" />;
       case 'dropped': return <Trash2 className="h-5 w-5" />;
       case 'completed': return <CheckCircle className="h-5 w-5" />;
+      case 'cancelled': return <AlertCircle className="h-5 w-5" />;
       default: return <AlertCircle className="h-5 w-5" />;
     }
   };
@@ -98,6 +101,9 @@ const MyRegistrations = () => {
       .filter(r => r.status === 'approved')
       .reduce((total, r) => total + (r.course?.credits || 0), 0);
   };
+
+  const hasAnyConflict = filteredRegistrations.some(r => r.hasConflict);
+  const hasAnySubjectConflict = filteredRegistrations.some(r => r.hasSubjectConflict);
 
   if (loading) {
     return (
@@ -214,11 +220,38 @@ const MyRegistrations = () => {
         </div>
       </div>
 
+      {/* Conflict Warning */}
+      {hasAnyConflict && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
+          <div className="flex">
+            <div className="py-1"><AlertCircle className="h-6 w-6 text-red-500 mr-4" /></div>
+            <div>
+              <p className="font-bold">Cảnh báo: Trùng lịch học!</p>
+              <p className="text-sm">Hệ thống phát hiện bạn đã đăng ký các học phần bị trùng lịch. Vui lòng kiểm tra và hủy một trong các học phần được đánh dấu màu đỏ để đảm bảo lịch học hợp lệ.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subject Conflict Warning */}
+      {hasAnySubjectConflict && (
+        <div className="bg-purple-100 border-l-4 border-purple-500 text-purple-700 p-4 rounded-md" role="alert">
+          <div className="flex">
+            <div className="py-1"><AlertCircle className="h-6 w-6 text-purple-500 mr-4" /></div>
+            <div>
+              <p className="font-bold">Cảnh báo: Đăng ký trùng môn học!</p>
+              <p className="text-sm">Hệ thống phát hiện bạn đã đăng ký nhiều lớp cho cùng một môn học. Vui lòng kiểm tra và hủy các lớp không cần thiết để đảm bảo dữ liệu hợp lệ.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {/* Registrations List */}
       {filteredRegistrations.length > 0 ? (
         <div className="space-y-4">
           {filteredRegistrations.map((registration) => (
-            <div key={registration._id} className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div key={registration._id} className={`bg-white rounded-lg shadow-sm border ${registration.hasConflict ? 'border-red-500 ring-2 ring-red-200' : registration.hasSubjectConflict ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'}`}>
               <div className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -233,14 +266,14 @@ const MyRegistrations = () => {
                     </div>
 
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {registration.course?.courseName}
+                      {registration.course?.subject?.subjectName}
                     </h3>
-                    <p className="text-sm text-gray-600 mb-3">{registration.course?.courseCode}</p>
+                    <p className="text-sm text-gray-600 mb-3">{registration.course?.subject?.subjectCode} - {registration.course?.classCode}</p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                       <div className="flex items-center text-sm text-gray-600">
                         <BookOpen className="h-4 w-4 mr-2 text-blue-500" />
-                        <span>{registration.course?.credits} tín chỉ</span>
+                        <span>{registration.course?.subject?.credits || registration.course?.credits} tín chỉ</span>
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
                         <User className="h-4 w-4 mr-2 text-green-500" />
@@ -248,11 +281,7 @@ const MyRegistrations = () => {
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
                         <Calendar className="h-4 w-4 mr-2 text-purple-500" />
-                        <span>Năm {registration.course?.yearLevel} - Học kỳ {registration.course?.semesterNumber}</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 mr-2 text-orange-500" />
-                        <span>{registration.course?.major}</span>
+                        <span>{registration.semester?.name}</span>
                       </div>
                     </div>
 
@@ -261,19 +290,17 @@ const MyRegistrations = () => {
                       <div className="mb-4">
                         <h4 className="text-sm font-medium text-gray-900 mb-2">Lịch học:</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {(Array.isArray(registration.course.schedule) ? registration.course.schedule : [registration.course.schedule]).map((session, index) => {
-                            const day = session.day ?? session.dayOfWeek;
-                            const numeric = typeof day === 'string' ? parseInt(day, 10) : day;
-                            const dayName = !Number.isNaN(numeric) && { 1: 'Thứ 2', 2: 'Thứ 3', 3: 'Thứ 4', 4: 'Thứ 5', 5: 'Thứ 6', 6: 'Thứ 7', 7: 'Chủ nhật' }[numeric]
-                              || { monday: 'Thứ 2', tuesday: 'Thứ 3', wednesday: 'Thứ 4', thursday: 'Thứ 5', friday: 'Thứ 6', saturday: 'Thứ 7', sunday: 'Chủ nhật' }[String(day).toLowerCase()]
-                              || String(day);
+                          {registration.course.schedule.map((session, index) => {
+                            const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
+                            const periodNames = { 1: 'Ca 1', 2: 'Ca 2', 3: 'Ca 3', 4: 'Ca 4' };
+
                             return (
-                              <div key={index} className="text-sm text-gray-600">
-                                <span className="font-medium">{dayName}</span>
-                                <span className="ml-2">{session.startTime} - {session.endTime}</span>
-                                {session.room && (
-                                  <span className="ml-2 text-gray-500">(Phòng {session.room})</span>
-                                )}
+                              <div key={index} className="text-sm text-gray-600 flex items-center">
+                                <Calendar className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" />
+                                <span>
+                                  {dayOfWeekNames[session.dayOfWeek]}, {periodNames[session.period]}
+                                  {session.classroom?.roomCode && `, P. ${session.classroom.roomCode}`}
+                                </span>
                               </div>
                             );
                           })}
@@ -326,7 +353,7 @@ const MyRegistrations = () => {
                       Chi tiết
                     </Link>
 
-                    {registration.status === 'approved' && (
+                    {registration.status === 'pending' && (
                       <button
                         onClick={() => handleDrop(registration._id)}
                         className="inline-flex items-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"

@@ -40,20 +40,29 @@ const Dashboard = () => {
       try {
         if (user?.role === 'student') {
           // Fetch student-specific data
-          const [registrationsRes, coursesRes] = await Promise.all([
+          const [registrationsRes, coursesRes, semesterRes] = await Promise.all([
             api.get('/api/registrations'),
-            api.get('/api/courses')
+            api.get('/api/courses'),
+            api.get('/api/semesters/current') // Fetch current semester data
           ]);
 
           const registrations = registrationsRes.data.registrations;
           const courses = coursesRes.data.courses;
+          const currentSemester = semesterRes.data;
+
+          // Calculate credits only from approved courses
+          const approvedCredits = registrations
+            .filter(r => r.status === 'approved')
+            .reduce((total, r) => {
+              return total + (r.course?.subject?.credits || 0);
+            }, 0);
 
           setStats({
             totalCourses: courses.length,
             enrolledCourses: registrations.filter(r => r.status === 'approved').length,
             completedCourses: registrations.filter(r => r.status === 'completed').length,
-            currentCredits: user.currentCredits || 0,
-            maxCredits: user.maxCredits || 24
+            currentCredits: approvedCredits,
+            maxCredits: currentSemester?.maxCreditsPerStudent || user.maxCredits || 24
           });
 
           setRecentRegistrations(registrations.slice(0, 5));
@@ -92,17 +101,19 @@ const Dashboard = () => {
       case 'rejected': return 'text-red-600 bg-red-100';
       case 'dropped': return 'text-gray-600 bg-gray-100';
       case 'completed': return 'text-blue-600 bg-blue-100';
+      case 'cancelled': return 'text-gray-600 bg-gray-200';
       default: return 'text-gray-600 bg-gray-100';
     }
   };
 
   const getStatusDisplayName = (status) => {
     switch (status) {
-      case 'approved': return 'Đã duyệt';
+      case 'approved': return 'Thành công';
       case 'pending': return 'Chờ duyệt';
       case 'rejected': return 'Từ chối';
       case 'dropped': return 'Đã xóa';
       case 'completed': return 'Hoàn thành';
+      case 'cancelled': return 'Lớp bị hủy';
       default: return status;
     }
   };
@@ -115,8 +126,13 @@ const Dashboard = () => {
           Chào mừng trở lại, {user?.firstName} {user?.lastName}!
         </h1>
         <p className="text-gray-600 mt-2">
-          {getRoleDisplayName(user?.role)} • {user?.school?.schoolName || 'Hệ thống'}
-          {user?.role === 'student' && ` • Năm ${user?.year} • Học kỳ ${user?.semester}`}
+          <span>{getRoleDisplayName(user?.role)}</span>
+          {user?.school?.schoolName && <span className="mx-2">•</span>}
+          <span>{user?.school?.schoolName}</span>
+          {user?.role === 'student' && user?.year && user?.semester && (
+            <span className="mx-2">•</span>
+          )}
+          {user?.role === 'student' && user?.year && user?.semester && `Năm ${user.year} • Học kỳ ${user.semester}`}
         </p>
       </div>
 
@@ -190,11 +206,13 @@ const Dashboard = () => {
                       <BookOpen className="h-6 w-6 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {registration.course?.courseName || 'Khóa học'}
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">Bạn đã đăng ký lớp học:</span> {registration.course?.subject?.subjectName || 'N/A'}
                       </p>
                       <p className="text-sm text-gray-500">
-                        {registration.course?.courseCode || 'Mã khóa học'}
+                        Mã lớp: <span className="font-semibold">{registration.course?.classCode || 'N/A'}</span>
+                        <span className="mx-2">•</span>
+                        Mã môn: {registration.course?.subject?.subjectCode || 'N/A'}
                       </p>
                     </div>
                   </div>

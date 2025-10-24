@@ -18,7 +18,7 @@ const RegistrationSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'approved', 'rejected', 'withdrawn', 'completed'],
+        enum: ['pending', 'approved', 'rejected', 'withdrawn', 'completed', 'cancelled'],
         default: 'pending'
     },
     registrationDate: {
@@ -68,6 +68,16 @@ const RegistrationSchema = new mongoose.Schema({
     rejectionReason: {
         type: String,
         trim: true
+    },
+    rejectionRequest: {
+        requested: {
+            type: Boolean,
+            default: false
+        },
+        reason: {
+            type: String,
+            trim: true
+        }
     },
     priority: {
         type: Number,
@@ -218,42 +228,6 @@ RegistrationSchema.pre('save', function (next) {
     }
 
     next();
-});
-
-// Post-save middleware to update course student count
-RegistrationSchema.post('save', async function (doc) {
-    try {
-        const Course = mongoose.model('Course');
-        const approvedCount = await mongoose.model('Registration').countDocuments({
-            course: doc.course,
-            status: 'approved'
-        });
-
-        await Course.findByIdAndUpdate(doc.course, {
-            currentStudents: approvedCount
-        });
-    } catch (error) {
-        console.error('Error updating course student count:', error);
-    }
-});
-
-// Post-remove middleware to update course student count
-RegistrationSchema.post('findOneAndDelete', async function (doc) {
-    if (doc) {
-        try {
-            const Course = mongoose.model('Course');
-            const approvedCount = await mongoose.model('Registration').countDocuments({
-                course: doc.course,
-                status: 'approved'
-            });
-
-            await Course.findByIdAndUpdate(doc.course, {
-                currentStudents: approvedCount
-            });
-        } catch (error) {
-            console.error('Error updating course student count:', error);
-        }
-    }
 });
 
 // Ensure virtual fields are serialized

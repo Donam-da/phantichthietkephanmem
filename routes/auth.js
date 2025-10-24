@@ -133,6 +133,11 @@ router.post('/login', [
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
+        // Fix for negative credits issue
+        if (user.currentCredits < 0) {
+            user.currentCredits = 0;
+        }
+
         // Update last login
         user.lastLogin = new Date();
         await user.save();

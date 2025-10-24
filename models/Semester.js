@@ -96,9 +96,7 @@ SemesterSchema.virtual('fullName').get(function () {
 // Check if semester is currently active for registration
 SemesterSchema.methods.isRegistrationOpen = function () {
     const now = new Date();
-    return now >= this.registrationStartDate &&
-        now <= this.registrationEndDate &&
-        this.isActive;
+    return now >= this.registrationStartDate && now <= this.registrationEndDate;
 };
 
 // Check if semester is in session
