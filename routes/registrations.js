@@ -154,6 +154,11 @@ router.post('/', [
       return res.status(400).json({ message: 'Course not found or inactive' });
     }
 
+    // --- FIX: Check if the associated subject exists ---
+    if (!course.subject) {
+      return res.status(400).json({ message: 'Lỗi: Môn học của lớp này không tồn tại. Vui lòng liên hệ quản trị viên.' });
+    }
+
     // Check if semester exists and registration is open (or course allows registration by its own deadline)
     const semester = await Semester.findById(semesterId);
     if (!semester) {
@@ -180,7 +185,11 @@ router.post('/', [
     const newCourseSubjectId = course.subject._id.toString();
 
     for (const reg of studentRegistrationsInSemester) {
-      const isSameSubject = reg.course && reg.course.subject && reg.course.subject._id.toString() === newCourseSubjectId;
+      // --- FIX: Add a check to ensure reg.course is not null ---
+      // This handles cases where a previously registered course was deleted.
+      if (!reg.course) continue;
+
+      const isSameSubject = reg.course.subject && reg.course.subject._id.toString() === newCourseSubjectId;
 
       if (isSameSubject && reg.status === 'approved') {
         return res.status(400).json({ message: `Bạn đã được duyệt cho lớp ${reg.course.classCode} của môn này. Không thể đăng ký hoặc đổi lớp.` });
@@ -219,7 +228,10 @@ router.post('/', [
 
     for (const newScheduleItem of course.schedule) {
       // Filter for registrations that are not the one we are trying to switch from
-      for (const existingReg of studentRegistrationsInSemester.filter(r => r.course._id.toString() !== courseId)) {
+      // --- FIX: Filter out registrations with null courses before checking for conflicts ---
+      const validExistingRegs = studentRegistrationsInSemester.filter(r => r.course && r.course._id.toString() !== courseId);
+
+      for (const existingReg of validExistingRegs) {
         for (const existingScheduleItem of existingReg.course.schedule) {
           if (
             newScheduleItem.dayOfWeek === existingScheduleItem.dayOfWeek &&

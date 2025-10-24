@@ -168,24 +168,23 @@ router.delete('/:id', [auth, admin], async (req, res) => {
         const Registration = require('../models/Registration');
         const User = require('../models/User');
         const registrations = await Registration.find({ course: req.params.id });
-
-        // Adjust credits for students whose registration was approved
-        const approvedRegistrations = registrations.filter(r => r.status === 'approved');
-        if (approvedRegistrations.length > 0) {
-            const creditsToDecrement = course.subject.credits || 0;
-            const studentIds = approvedRegistrations.map(r => r.student);
-            await User.updateMany(
-                { _id: { $in: studentIds } },
-                { $inc: { currentCredits: -creditsToDecrement } }
-            );
+        
+        // --- FIX: Correctly handle student credits and delete registrations ---
+        if (registrations.length > 0) {
+            const creditsToDecrement = course.subject?.credits || 0;
+            for (const reg of registrations) {
+                // Only decrement credits if the registration was approved
+                if (reg.status === 'approved' && creditsToDecrement > 0) {
+                    await User.findByIdAndUpdate(reg.student, { $inc: { currentCredits: -creditsToDecrement } });
+                }
+            }
+            // Delete all registrations associated with the course
+            await Registration.deleteMany({ course: req.params.id });
         }
-
-        // Update status of all registrations to 'cancelled'
-        await Registration.updateMany({ course: req.params.id }, { $set: { status: 'cancelled' } });
 
         // Now, delete the course itself
         await Course.findByIdAndDelete(req.params.id);
-        res.json({ msg: 'Lớp học phần đã được xóa và các đăng ký liên quan đã được cập nhật.' });
+        res.json({ msg: 'Lớp học phần và tất cả các đăng ký liên quan đã được xóa thành công.' });
     } catch (error) {
         console.error(error.message);
         if (error.kind === 'ObjectId') {

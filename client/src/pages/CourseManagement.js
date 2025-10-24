@@ -560,7 +560,8 @@ const CourseManagement = () => {
                 <div className="border p-4 rounded-md bg-gray-50">
                   <h4 className="text-md font-medium text-gray-900 mb-3">Thông tin lịch học</h4>
                   {formData.schedule.map((item, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center mb-2">
+                    <div key={index} className="border-b pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0">
+                      <div className="grid grid-cols-12 gap-2 items-center mb-2">
                       <div className="col-span-4">
                         <label className="block text-sm font-medium text-gray-700">Thứ</label>
                         <select value={item.dayOfWeek} onChange={(e) => handleScheduleChange(index, 'dayOfWeek', parseInt(e.target.value))} className="mt-1 input-field">
@@ -587,6 +588,22 @@ const CourseManagement = () => {
                           </button>
                         )}
                       </div>
+                      </div>
+                      {/* Hiển thị các ngày học dự kiến */}
+                      <div className="mt-2 text-xs text-gray-600">
+                        <p className="font-semibold mb-1">Các ngày học dự kiến:</p>
+                        <div className="pl-2 max-h-20 overflow-y-auto">
+                          {formData.semester && item.dayOfWeek ? (
+                            getDatesForDayOfWeek(formData.semester, item.dayOfWeek).map((date, dateIndex, arr) => (
+                              <React.Fragment key={dateIndex}>
+                                <span className="text-green-600 font-medium">{date.toLocaleDateString('vi-VN')}</span>
+                                {dateIndex < arr.length - 1 && <span className="text-gray-500">, </span>}
+                              </React.Fragment>
+                            ))
+                          ) : <span className="text-gray-400">Vui lòng chọn học kỳ và thứ...</span>}
+                        </div>
+                      </div>
+
                     </div>
                   ))}
                   <button type="button" onClick={addSchedule} className="mt-2 text-sm text-blue-600 hover:text-blue-800">
@@ -776,45 +793,57 @@ const CourseManagement = () => {
       })()}
 
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <ul className="divide-y divide-gray-200">
-          {filteredCourses.map((course) => (
-            <li 
-              key={course._id} 
-              className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 cursor-pointer"
-              onClick={(e) => handleClickCourse(e, course)}
-              onMouseEnter={() => setHoveredCourseId(course._id)}
-              onMouseLeave={() => setHoveredCourseId(null)}
-              onMouseMove={handleMouseMove}
-            >
-              <div className="w-full flex items-center justify-between group">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {isTeacher && (
-                    course.teacher?._id === user.id ? (
-                      <Star className="h-5 w-5 text-yellow-400 fill-current flex-shrink-0" />
-                    ) : (
-                      <div className="h-5 w-5 flex-shrink-0" />
-                    )
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-base font-medium text-indigo-600 truncate group-hover:underline">{course.subject?.subjectName} ({course.subject?.subjectCode})</p>
-                    <p className="text-sm text-gray-500">Mã lớp: {course.classCode}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-6 ml-4 flex-shrink-0">
-                  <div className="w-24 text-right">
-                    <span className="text-sm text-gray-700">{course.currentStudents}/{course.maxStudents} SV</span>
-                  </div>
-                  {!isTeacher && (
-                    <div className="w-20 flex flex-col items-end space-y-1">
-                        <button onClick={(e) => { e.preventDefault(); handleEdit(course); }} className="text-blue-600 hover:text-blue-900 text-sm font-medium">Chỉnh sửa</button>
-                        <button onClick={(e) => { e.preventDefault(); handleDelete(course._id); }} className="text-red-600 hover:text-red-900 text-sm font-medium">Xóa</button>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Môn học</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giảng viên</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lịch học</th>
+                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Sĩ số</th>
+                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                <th scope="col" className="relative px-6 py-3"><span className="sr-only">Hành động</span></th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredCourses.map((course) => (
+                <tr key={course._id} className="hover:bg-gray-50 group" onMouseEnter={() => setHoveredCourseId(course._id)} onMouseLeave={() => setHoveredCourseId(null)} onMouseMove={handleMouseMove}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900">{course.subject?.subjectName}</div>
+                        <div className="text-sm text-gray-500">{course.subject?.subjectCode} - {course.classCode}</div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{course.teacher?.firstName} {course.teacher?.lastName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {course.schedule.map((s, i) => (
+                      <div key={i}>{dayOfWeekNames[s.dayOfWeek]}, {periodNames[s.period]}</div>
+                    ))}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{course.currentStudents}/{course.maxStudents}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${course.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {course.isActive ? 'Hoạt động' : 'Đã khóa'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end gap-4">
+                      <button onClick={(e) => { e.stopPropagation(); handleClickCourse(e, course); }} className="text-gray-500 hover:text-indigo-600">Xem lịch</button>
+                      {!isTeacher && (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); handleEdit(course); }} className="text-indigo-600 hover:text-indigo-900">Sửa</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(course._id); }} className="text-red-600 hover:text-red-900">Xóa</button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

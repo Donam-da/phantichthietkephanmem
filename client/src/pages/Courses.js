@@ -122,6 +122,12 @@ const Courses = () => {
   const handleConfirmRegister = async () => {
     if (!selectedCourseForSchedule) return;
 
+    // --- FIX: Add validation to prevent crash if semester is null ---
+    if (!selectedCourseForSchedule.semester?._id) {
+      toast.error('Lỗi: Lớp học phần này không thuộc về một học kỳ hợp lệ. Vui lòng liên hệ quản trị viên.');
+      return;
+    }
+
     try {
       const response = await api.post('/api/registrations', {
         courseId: selectedCourseForSchedule._id,
