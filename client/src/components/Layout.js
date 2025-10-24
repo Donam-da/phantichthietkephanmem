@@ -18,38 +18,108 @@ import {
   BookCopy // Thêm icon cho Môn học
 } from 'lucide-react';
 
-const Layout = () => {
-  const { user, logout, isAdmin, isTeacher } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+// --- REFACTOR: Create a reusable NavigationMenu component ---
+const NavigationMenu = ({ userRole, onLinkClick }) => {
   const location = useLocation();
-  const navigate = useNavigate();
-
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home, show: !isTeacher },
-    { name: 'Khóa học', href: isAdmin ? '/admin/courses' : (isTeacher ? '/admin/courses' : '/courses'), icon: BookOpen, show: true },
-    { name: 'Đăng ký của tôi', href: '/my-registrations', icon: ClipboardList, show: !isAdmin && !isTeacher },
-    { name: 'Hồ sơ', href: '/profile', icon: User },
-  ].filter(item => item.show !== false);
-
-  const adminNavigation = [
-    { name: 'Quản trị', href: '/admin', icon: Settings },
-    { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
-    { name: 'Quản lý giảng viên', href: '/admin/teachers', icon: GraduationCap },
-    { name: 'Quản lý khóa học', href: '/admin/courses', icon: BookOpen },
-    { name: 'Quản lý trường', href: '/admin/schools', icon: Building },
-    { name: 'Quản lý môn học', href: '/admin/subjects', icon: BookCopy },
-    { name: 'Quản lý phòng học', href: '/admin/classrooms', icon: DoorOpen },
-    { name: 'Quản lý đăng ký', href: '/admin/registrations', icon: ClipboardList },
-    { name: 'Quản lý học kỳ', href: '/admin/semesters', icon: Calendar },
-  ];
-
-  const teacherNavigation = [
-    { name: 'Dashboard', href: '/teacher/dashboard', icon: Home },
-    { name: 'Duyệt đăng ký', href: '/admin/registrations', icon: ClipboardList },
-    // Thêm các mục khác cho giảng viên ở đây, ví dụ: Quản lý tài liệu, Lịch học...
-  ];
-
   const isActive = (href) => location.pathname === href;
+
+  // --- REFACTOR: Centralize navigation logic ---
+  const getNavigation = () => {
+    const baseNav = [
+      { name: 'Hồ sơ', href: '/profile', icon: User },
+    ];
+
+    if (userRole === 'admin') {
+      return {
+        general: [
+          { name: 'Dashboard', href: '/admin', icon: Home },
+        ],
+        admin: [
+          { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
+          { name: 'Quản lý giảng viên', href: '/admin/teachers', icon: GraduationCap },
+          { name: 'Quản lý khóa học', href: '/admin/courses', icon: BookOpen },
+          { name: 'Quản lý trường', href: '/admin/schools', icon: Building },
+          { name: 'Quản lý môn học', href: '/admin/subjects', icon: BookCopy },
+          { name: 'Quản lý phòng học', href: '/admin/classrooms', icon: DoorOpen },
+          { name: 'Quản lý đăng ký', href: '/admin/registrations', icon: ClipboardList },
+          { name: 'Quản lý học kỳ', href: '/admin/semesters', icon: Calendar },
+        ]
+      };
+    }
+
+    if (userRole === 'teacher') {
+      return {
+        general: [
+          { name: 'Dashboard', href: '/teacher/dashboard', icon: Home },
+          { name: 'Khóa học của tôi', href: '/admin/courses', icon: BookOpen },
+          { name: 'Duyệt đăng ký', href: '/admin/registrations', icon: ClipboardList },
+          ...baseNav
+        ]
+      };
+    }
+
+    // Default to student
+    return {
+      general: [
+        { name: 'Dashboard', href: '/dashboard', icon: Home },
+        { name: 'Khóa học', href: '/courses', icon: BookOpen },
+        { name: 'Đăng ký của tôi', href: '/my-registrations', icon: ClipboardList },
+        ...baseNav
+      ]
+    };
+  };
+
+  const navConfig = getNavigation();
+
+  return (
+    <nav className="flex-1 space-y-1 px-2 py-4">
+      {navConfig.general?.map((item) => (
+        <Link
+          key={item.name}
+          to={item.href}
+          className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
+              ? 'bg-blue-100 text-blue-900'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          onClick={onLinkClick}
+        >
+          <item.icon className="mr-3 h-5 w-5" />
+          {item.name}
+        </Link>
+      ))}
+
+      {navConfig.admin && (
+        <>
+          <div className="pt-4 pb-2">
+            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Quản trị
+            </h3>
+          </div>
+          {navConfig.admin.map((item) => (
+            <Link
+              key={item.name}
+              to={item.href}
+              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
+                  ? 'bg-blue-100 text-blue-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              onClick={onLinkClick}
+            >
+              <item.icon className="mr-3 h-5 w-5" />
+              {item.name}
+            </Link>
+          ))}
+        </>
+      )}
+    </nav>
+  );
+};
+
+const Layout = () => {
+  const { user, isAdmin, isTeacher } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const userRole = isAdmin ? 'admin' : isTeacher ? 'teacher' : 'student';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -63,64 +133,7 @@ const Layout = () => {
               <X className="h-6 w-6 text-gray-400" />
             </button>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
-            {isTeacher && !isAdmin && (
-              <>
-                {teacherNavigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-                        ? 'bg-blue-100 text-blue-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </Link>
-                ))}
-                <div className="pt-4"></div>
-              </>
-            )}
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.name}
-              </Link>
-            ))}
-            {isAdmin && (
-              <>
-                <div className="pt-4 pb-2">
-                  <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Quản trị
-                  </h3>
-                </div>
-                {adminNavigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-                        ? 'bg-blue-100 text-blue-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </Link>
-                ))}
-              </>
-            )}
-          </nav>
+          <NavigationMenu userRole={userRole} onLinkClick={() => setSidebarOpen(false)} />
         </div>
       </div>
 
@@ -130,61 +143,7 @@ const Layout = () => {
           <div className="flex items-center h-16 px-4 border-b border-gray-200">
             <h1 className="text-xl font-bold text-gray-900">Quản lý Tín chỉ</h1>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
-            {isTeacher && !isAdmin && (
-              <>
-                {teacherNavigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-                        ? 'bg-blue-100 text-blue-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </Link>
-                ))}
-                <div className="pt-4"></div>
-              </>
-            )}
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.name}
-              </Link>
-            ))}
-            {isAdmin && (
-              <>
-                <div className="pt-4 pb-2">
-                  <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Quản trị
-                  </h3>
-                </div>
-                {adminNavigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-                        ? 'bg-blue-100 text-blue-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </Link>
-                ))}
-              </>
-            )}
-          </nav>
+          <NavigationMenu userRole={userRole} />
         </div>
       </div>
 

@@ -324,10 +324,18 @@ router.post('/switch', [
       return res.status(400).json({ message: 'Lớp học phần mới không tồn tại hoặc đã đầy.' });
     }
 
+    // --- FIX: Decrement student count for the old course if it was approved ---
+    // This was the source of the negative student count bug.
+    if (oldReg.status === 'approved') {
+      await Course.findByIdAndUpdate(oldReg.course._id, { $inc: { currentStudents: -1 } });
+      // Credits don't need to be adjusted as they are for the same subject.
+    }
+
     // 3. Delete the old registration
     await Registration.findByIdAndDelete(oldRegistrationId);
 
     // 4. Create the new registration
+    // The new registration will be 'pending' and won't affect the new course's student count until approved.
     const newReg = new Registration({
       student: req.user.id,
       course: newCourseId,
@@ -506,13 +514,11 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    // Allow deletion if registration period is still open, regardless of status (except rejected/withdrawn)
-    if (registration.status !== 'pending') {
-      return res.status(400).json({ message: 'Chỉ có thể hủy đăng ký khi đang ở trạng thái "Chờ duyệt".' });
+    // Students can only drop courses that are 'pending' or 'approved'.
+    // You might want to add a check for the drop deadline here as well.
+    if (registration.status !== 'pending' && registration.status !== 'approved') {
+      return res.status(400).json({ message: `Không thể hủy đăng ký ở trạng thái "${registration.status}".` });
     }
-
-    // Delete the registration document entirely
-    await Registration.findByIdAndDelete(req.params.id);
 
     // Only decrease counts if the registration was approved
     if (registration.status === 'approved') {
@@ -521,6 +527,9 @@ router.delete('/:id', auth, async (req, res) => {
       // Atomically update student's credit count
       await User.findByIdAndUpdate(req.user.id, { $inc: { currentCredits: -registration.course.subject.credits } });
     }
+
+    // Delete the registration document entirely
+    await Registration.findByIdAndDelete(req.params.id);
 
     res.json({ message: 'Course dropped successfully' });
   } catch (error) {
