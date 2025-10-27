@@ -43,13 +43,15 @@ router.get('/', auth, async (req, res) => {
 // @route   PUT api/classrooms/:id
 // @desc    Cập nhật thông tin phòng học
 // @access  Private (Admin)
-router.put('/:id', [auth, admin], async (req, res) => {
-    const { roomType, capacity, isActive } = req.body;
+router.put('/:id', [auth, admin], async (req, res) => { // Giữ lại dòng này
+    const { roomType, capacity, isActive, notes } = req.body;
+    const { scheduledEvents } = req.body; // Lấy mảng sự kiện từ request body
     const fieldsToUpdate = {};
     if (roomType) fieldsToUpdate.roomType = roomType;
     if (capacity) fieldsToUpdate.capacity = capacity;
     if (isActive !== undefined) fieldsToUpdate.isActive = isActive;
-
+    if (notes !== undefined) fieldsToUpdate.notes = notes;
+    if (scheduledEvents !== undefined) fieldsToUpdate.scheduledEvents = scheduledEvents; // Cập nhật mảng sự kiện
     try {
         let classroom = await Classroom.findById(req.params.id);
         if (!classroom) return res.status(404).json({ msg: 'Không tìm thấy phòng học' });

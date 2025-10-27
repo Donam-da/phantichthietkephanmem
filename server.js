@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config({ path: './config.env' });
+const classroomScheduler = require('./services/classroomScheduler');
 const path = require('path');
 
 const app = express();
@@ -29,6 +30,9 @@ app.use(limiter);
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/credit_registration')
   .then(() => console.log('MongoDB connected successfully'))
   .catch(err => console.error('MongoDB connection error:', err));
+
+// Start the classroom scheduler
+classroomScheduler();
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));

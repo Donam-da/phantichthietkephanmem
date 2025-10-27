@@ -20,6 +20,21 @@ const ClassroomSchema = new mongoose.Schema({
         type: Boolean,
         default: true,
     },
+    scheduledEvents: [{ // An array of scheduled downtime periods
+        deactivationTime: {
+            type: Date,
+            required: true
+        },
+        activationTime: {
+            type: Date,
+            required: true
+        },
+        notes: { type: String, trim: true }
+    }],
+    notes: {
+        type: String,
+        trim: true,
+    },
 }, {
     timestamps: true
 });
