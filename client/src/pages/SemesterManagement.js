@@ -61,26 +61,27 @@ const SemesterManagement = () => {
 
   const handleDateChange = (e) => {
     const { name, value } = e.target;
-    const newFormData = { ...formData, [name]: value };
+    let newFormData = { ...formData, [name]: value };
 
-    const addDaysAndFormat = (dateString, days) => {
-        if (!dateString) return '';
-        try {
-            const date = new Date(dateString);
-            date.setDate(date.getDate() + days);
-            return date.toISOString().split('T')[0];
-        } catch (error) {
-            return '';
-        }
-    };
-
+    // Khi ngày bắt đầu thay đổi, tự động cập nhật các ngày khác
     if (name === 'startDate' && value) {
-        newFormData.endDate = addDaysAndFormat(value, 1);
-    }
+      try {
+        const startDate = new Date(value);
 
-    if (name === 'registrationStartDate' && value) {
-        newFormData.registrationEndDate = addDaysAndFormat(value, 1);
-        newFormData.withdrawalDeadline = addDaysAndFormat(value, 1);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 70); // +70 ngày
+        newFormData.endDate = endDate.toISOString().split('T')[0];
+
+        const registrationStartDate = new Date(startDate);
+        registrationStartDate.setDate(startDate.getDate() - 25); // -25 ngày
+        newFormData.registrationStartDate = registrationStartDate.toISOString().split('T')[0];
+
+        const registrationEndDate = new Date(registrationStartDate);
+        registrationEndDate.setDate(registrationStartDate.getDate() + 10); // +10 ngày
+        newFormData.registrationEndDate = registrationEndDate.toISOString().split('T')[0];
+      } catch (error) {
+        console.error("Lỗi định dạng ngày tháng:", error);
+      }
     }
 
     setFormData(newFormData);
@@ -179,6 +180,21 @@ const SemesterManagement = () => {
     setShowForm(true);
   };
 
+  const handleDelete = async (id) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa học kỳ này? Thao tác này không thể hoàn tác.')) {
+        const toastId = toast.loading('Đang xóa...');
+        try {
+            await api.delete(`/api/semesters/${id}`);
+            toast.success('Xóa học kỳ thành công!', { id: toastId });
+            setShowForm(false);
+            setEditingSemester(null);
+            fetchSemesters();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Lỗi khi xóa học kỳ.', { id: toastId });
+        }
+    }
+  };
+
   const handleActivate = async (semesterId) => {
     try {
       await api.put(`/api/semesters/${semesterId}/activate`);
@@ -187,6 +203,43 @@ const SemesterManagement = () => {
     } catch (error) {
       toast.error('Lỗi khi kích hoạt học kỳ');
     }
+  };
+
+  const openNewSemesterForm = () => {
+    setEditingSemester(null);
+    const newYear = getCurrentAcademicYear();
+    
+    // Semester dates
+    const today = new Date();
+    const startDate = new Date(today);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 70); // Semester ends 10 weeks after it starts
+
+    // Registration dates
+    const registrationStartDate = new Date(startDate);
+    registrationStartDate.setDate(startDate.getDate() - 25); // Registration starts 25 days before semester
+    const registrationEndDate = new Date(registrationStartDate);
+    registrationEndDate.setDate(registrationStartDate.getDate() + 10); // Registration ends 10 days after it starts
+
+    // Withdrawal deadline (5 weeks after start date, which is 1/2 of the semester)
+    const withdrawalDeadline = new Date(startDate);
+    withdrawalDeadline.setDate(startDate.getDate() + 35); // 5 weeks * 7 days
+
+    setFormData({
+      code: '',
+      namePart: '',
+      academicYearStart: newYear.start,
+      academicYearEnd: newYear.end,
+      startDate: today.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0], // Mặc định là 10 tuần sau
+      registrationStartDate: registrationStartDate.toISOString().split('T')[0],
+      registrationEndDate: registrationEndDate.toISOString().split('T')[0],
+      withdrawalDeadline: withdrawalDeadline.toISOString().split('T')[0],
+      maxCreditsPerStudent: 16,
+      minCreditsPerStudent: 8,
+      description: ''
+    });
+    setShowForm(true);
   };
 
   if (loading) {
@@ -202,7 +255,7 @@ const SemesterManagement = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Quản lý học kỳ</h1>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={openNewSemesterForm}
           className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
         >
           Thêm học kỳ mới
@@ -364,23 +417,29 @@ const SemesterManagement = () => {
                     />
                   </div>
                 </div>
-                <div className="flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false);
-                      setEditingSemester(null);
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                  >
-                    {editingSemester ? 'Cập nhật' : 'Tạo mới'}
-                  </button>
+                <div className="flex justify-between items-center pt-4">
+                    <div>
+                        {editingSemester && (
+                            <button type="button" onClick={() => handleDelete(editingSemester._id)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                                Xóa
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex space-x-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowForm(false);
+                                setEditingSemester(null);
+                            }}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                        >
+                            Hủy
+                        </button>
+                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                            {editingSemester ? 'Cập nhật' : 'Tạo mới'}
+                        </button>
+                    </div>
                 </div>
               </form>
             </div>
@@ -391,7 +450,7 @@ const SemesterManagement = () => {
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
           {semesters.map((semester) => (
-            <li key={semester._id} className="px-6 py-4">
+            <li key={semester._id} onClick={() => handleEdit(semester)} className="px-6 py-4 hover:bg-gray-50 cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
@@ -423,12 +482,6 @@ const SemesterManagement = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2 ml-4">
-                  <button
-                    onClick={() => handleEdit(semester)}
-                    className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-                  >
-                    Chỉnh sửa
-                  </button>
                   {!semester.isCurrent && (
                     <button
                       onClick={() => handleActivate(semester._id)}

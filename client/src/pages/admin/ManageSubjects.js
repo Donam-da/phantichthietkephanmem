@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -99,6 +99,7 @@ const ManageSubjects = () => {
             try {
                 await axios.delete(`/api/subjects/${id}`, getAuthHeaders());
                 toast.success('Xóa thành công!', { id: toastId });
+                closeModal(); // Đóng modal sau khi xóa
                 fetchData();
             } catch (error) {
                 toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
@@ -125,25 +126,16 @@ const ManageSubjects = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Môn học</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số TC</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Các trường</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {subjects.map((subject) => (
-                                <tr key={subject._id}>
+                                <tr key={subject._id} onClick={() => openModal(subject)} className="hover:bg-gray-50 cursor-pointer">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{subject.subjectCode}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{subject.subjectName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{subject.credits}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                         {subject.schools.map(s => s.schoolCode).join(', ')}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => openModal(subject)} className="text-indigo-600 hover:text-indigo-900 mr-4">
-                                            <Edit className="h-5 w-5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(subject._id)} className="text-red-600 hover:text-red-900">
-                                            <Trash2 className="h-5 w-5" />
-                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -189,13 +181,22 @@ const ManageSubjects = () => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-end mt-6">
-                                <button type="button" onClick={closeModal} className="btn btn-secondary mr-3">
-                                    Hủy
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    Lưu
-                                </button>
+                            <div className="flex items-center justify-between mt-6">
+                                <div>
+                                    {currentSubject && (
+                                        <button type="button" onClick={() => handleDelete(currentSubject._id)} className="btn btn-danger">
+                                            Xóa môn học
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex space-x-3">
+                                    <button type="button" onClick={closeModal} className="btn btn-secondary">
+                                        Hủy
+                                    </button>
+                                    <button type="submit" className="btn btn-primary">
+                                        Lưu
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>

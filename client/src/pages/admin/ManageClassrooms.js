@@ -223,9 +223,9 @@ const ManageClassrooms = () => {
                                             <p className="text-xs font-semibold text-gray-500">Lịch khóa phòng:</p>
                                             <ul className="list-none pl-0 space-y-1">
                                                 {room.scheduledEvents.map((event, index) => (
-                                                    <li key={index} className="flex items-center text-xs text-gray-700">
+                                                    <li key={index} className="flex items-center text-xs">
                                                         <Clock size={12} className="mr-2 text-blue-500 flex-shrink-0" />
-                                                        <span>{new Date(event.deactivationTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} <ArrowRight size={10} className="inline-block mx-1" /> {new Date(event.activationTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} {event.notes && <span className="text-gray-500 ml-2 italic">({event.notes})</span>}</span>
+                                                        <span className="text-gray-900 font-semibold">{new Date(event.deactivationTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} <ArrowRight size={10} className="inline-block mx-1 text-gray-500" /> {new Date(event.activationTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} {event.notes && <span className="text-gray-500 ml-2 italic font-normal">({event.notes})</span>}</span>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -235,7 +235,9 @@ const ManageClassrooms = () => {
                                         <p className="text-xs text-red-500 mt-1">Lý do khóa: {room.notes}</p>
                                     )}
                                     {room.isActive && room.notes && (
-                                        <p className="text-xs text-gray-400 mt-1">Hành động trước đó: {room.notes}</p>
+                                        <p className="text-xs mt-1">
+                                            <span className="text-amber-700">Hành động trước đó: </span><span className="text-gray-500">{room.notes}</span>
+                                        </p>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-4">

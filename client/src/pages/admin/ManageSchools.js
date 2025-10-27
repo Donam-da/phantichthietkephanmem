@@ -1,6 +1,6 @@
 // client/src/pages/admin/ManageSchools.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 // Giả định bạn có một file api service, nếu không có thể dùng axios trực tiếp
 // import api from '../../services/api'; 
@@ -86,6 +86,7 @@ const ManageSchools = () => {
             try {
                 await axios.delete(`/api/schools/${id}`, getAuthHeaders());
                 toast.success('Xóa thành công!', { id: toastId });
+                closeModal(); // Đóng modal sau khi xóa
                 fetchSchools();
             } catch (error) {
                 toast.error('Xóa thất bại.', { id: toastId });
@@ -112,22 +113,13 @@ const ManageSchools = () => {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã Trường</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Trường</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {schools.map((school) => (
-                                <tr key={school._id}>
+                                <tr key={school._id} onClick={() => openModal(school)} className="hover:bg-gray-50 cursor-pointer">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{school.schoolCode}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{school.schoolName}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => openModal(school)} className="text-indigo-600 hover:text-indigo-900 mr-4">
-                                            <Edit className="h-5 w-5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(school._id)} className="text-red-600 hover:text-red-900">
-                                            <Trash2 className="h-5 w-5" />
-                                        </button>
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -167,13 +159,22 @@ const ManageSchools = () => {
                                     required
                                 />
                             </div>
-                            <div className="flex items-center justify-end mt-6">
-                                <button type="button" onClick={closeModal} className="btn btn-secondary mr-3">
-                                    Hủy
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    Lưu
-                                </button>
+                            <div className="flex items-center justify-between mt-6">
+                                <div>
+                                    {currentSchool && (
+                                        <button type="button" onClick={() => handleDelete(currentSchool._id)} className="btn btn-danger">
+                                            Xóa trường
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex space-x-3">
+                                    <button type="button" onClick={closeModal} className="btn btn-secondary">
+                                        Hủy
+                                    </button>
+                                    <button type="submit" className="btn btn-primary">
+                                        Lưu
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>

@@ -20,7 +20,17 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       const response = await api.get('/api/users');
-      setUsers(response.data.users);
+      // Sắp xếp người dùng theo vai trò: admin > teacher > student
+      const sortedUsers = response.data.users.sort((a, b) => {
+        const roleOrder = { admin: 1, teacher: 2, student: 3 };
+        const roleA = roleOrder[a.role] || 4;
+        const roleB = roleOrder[b.role] || 4;
+        if (roleA !== roleB) {
+          return roleA - roleB;
+        }
+        return a.lastName.localeCompare(b.lastName); // Sắp xếp theo tên nếu cùng vai trò
+      });
+      setUsers(sortedUsers);
     } catch (error) {
       toast.error('Lỗi khi tải danh sách người dùng');
     } finally {

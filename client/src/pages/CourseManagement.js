@@ -318,6 +318,7 @@ const CourseManagement = () => {
       try {
         await api.delete(`/api/courses/${courseId}`);
         toast.success('Xóa lớp học phần thành công');
+        resetForm(); // Đóng form sau khi xóa
         // Refetch courses
         triggerRefetch();
       } catch (error) {
@@ -648,20 +649,20 @@ const CourseManagement = () => {
                     + Thêm lịch học
                   </button>
                 </div>
-                <div className="flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                  >
-                    {editingCourse ? 'Cập nhật' : 'Tạo mới'}
-                  </button>
+                <div className="flex justify-between items-center pt-4">
+                    <div>
+                        {editingCourse && (
+                            <button type="button" onClick={() => handleDelete(editingCourse._id)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                                Xóa
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex space-x-2">
+                        <button type="button" onClick={resetForm} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Hủy</button>
+                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                            {editingCourse ? 'Cập nhật' : 'Tạo mới'}
+                        </button>
+                    </div>
                 </div>
               </form>
             </div>
@@ -844,22 +845,18 @@ const CourseManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCourses.map((course) => (
-                <tr key={course._id} className="hover:bg-gray-50 group" onMouseEnter={() => setHoveredCourseId(course._id)} onMouseLeave={() => setHoveredCourseId(null)} onMouseMove={handleMouseMove}>
+              {filteredCourses.map((course) => ( // Giữ lại dòng này
+                <tr key={course._id} onClick={() => handleEdit(course)} className="hover:bg-gray-50 group cursor-pointer" onMouseEnter={() => setHoveredCourseId(course._id)} onMouseLeave={() => setHoveredCourseId(null)} onMouseMove={handleMouseMove}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-gray-900">{course.subject?.subjectName}</div>
-                        <div className="text-sm text-gray-500">{course.subject?.subjectCode} - {course.classCode}</div>
+                        <div className="text-sm text-gray-500">{course.subject?.subjectCode} - {course.classCode}</div> {/* Giữ lại dòng này */}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{course.teacher?.firstName} {course.teacher?.lastName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {course.schedule.map((s, i) => (
-                      <div key={i}>{dayOfWeekNames[s.dayOfWeek]}, {periodNames[s.period]}</div>
-                    ))}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{course.schedule.map((s, i) => (<div key={i}>{dayOfWeekNames[s.dayOfWeek]}, {periodNames[s.period]}</div>))}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{course.currentStudents}/{course.maxStudents}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${course.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -868,13 +865,7 @@ const CourseManagement = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-4">
-                      <button onClick={(e) => { e.stopPropagation(); handleClickCourse(e, course); }} className="text-gray-500 hover:text-indigo-600">Xem lịch</button>
-                      {!isTeacher && (
-                        <>
-                          <button onClick={(e) => { e.stopPropagation(); handleEdit(course); }} className="text-indigo-600 hover:text-indigo-900">Sửa</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDelete(course._id); }} className="text-red-600 hover:text-red-900">Xóa</button>
-                        </>
-                      )}
+                      <button onClick={(e) => { e.stopPropagation(); handleClickCourse(e, course); }} className="text-red-600 hover:text-red-800 font-semibold">Xem lịch</button>
                     </div>
                   </td>
                 </tr>

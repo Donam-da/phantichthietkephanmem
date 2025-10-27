@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -91,6 +91,7 @@ const ManageTeachers = () => {
             try {
                 await axios.delete(`/api/users/${id}`, getAuthHeaders());
                 toast.success('Xóa thành công!', { id: toastId });
+                closeModal(); // Đóng modal sau khi xóa
                 fetchTeachers();
             } catch (error) {
                 toast.error(error.response?.data?.message || 'Xóa thất bại.', { id: toastId });
@@ -117,22 +118,13 @@ const ManageTeachers = () => {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Họ và tên</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {teachers.map((teacher) => (
-                                <tr key={teacher._id}>
+                                <tr key={teacher._id} onClick={() => openModal(teacher)} className="hover:bg-gray-50 cursor-pointer">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{teacher.firstName} {teacher.lastName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{teacher.email}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => openModal(teacher)} className="text-indigo-600 hover:text-indigo-900 mr-4">
-                                            <Edit className="h-5 w-5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(teacher._id)} className="text-red-600 hover:text-red-900">
-                                            <Trash2 className="h-5 w-5" />
-                                        </button>
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -159,13 +151,22 @@ const ManageTeachers = () => {
                                 <label className="block text-sm font-medium text-gray-700">Mật khẩu</label>
                                 <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="mt-1 input-field" placeholder={currentTeacher ? 'Để trống nếu không đổi' : 'Nhập mật khẩu'} required={!currentTeacher} />
                             </div>
-                            <div className="flex items-center justify-end mt-6">
-                                <button type="button" onClick={closeModal} className="btn btn-secondary mr-3">
-                                    Hủy
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    Lưu
-                                </button>
+                            <div className="flex items-center justify-between mt-6">
+                                <div>
+                                    {currentTeacher && (
+                                        <button type="button" onClick={() => handleDelete(currentTeacher._id)} className="btn btn-danger">
+                                            Xóa giảng viên
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex space-x-3">
+                                    <button type="button" onClick={closeModal} className="btn btn-secondary">
+                                        Hủy
+                                    </button>
+                                    <button type="submit" className="btn btn-primary">
+                                        Lưu
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
