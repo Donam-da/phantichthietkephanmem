@@ -1,26 +1,23 @@
+
 // clearAndSeedAdmin.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 
 // Tải các biến môi trường từ file .env
-dotenv.config();
+dotenv.config({ path: '../config.env' });
 
 // Giả định bạn có một User model và hàm kết nối DB như sau:
 // Vui lòng điều chỉnh đường dẫn nếu cần thiết
-const User = require('./models/User'); 
+const User = require('../models/User'); 
 
 const clearData = async () => {
     try {
-        const collections = await mongoose.connection.db.collections();
+        const collections = mongoose.connection.collections;
         console.log('Đang xóa dữ liệu cũ...');
-        for (const collection of collections) {
-            // Không xóa collection 'system.views' nếu có
-            if (collection.collectionName.startsWith('system.')) {
-                continue;
-            }
+        for (const key in collections) {
+            const collection = collections[key];
             await collection.deleteMany({});
-            console.log(`Đã xóa collection: ${collection.collectionName}`);
+            console.log(`Đã xóa collection: ${collection.name}`);
         }
         console.log('Xóa dữ liệu thành công.');
     } catch (error) {
@@ -44,10 +41,9 @@ const seedAdmin = async () => {
             firstName: 'Admin',
             lastName: 'User',
             email: 'admin@example.com',
-            password: '123456', // Cung cấp mật khẩu dạng thô, model sẽ tự động mã hóa
+            password: '123456', // Mật khẩu sẽ được hash tự động bởi model
             role: 'admin',
-            isActive: true, // Đảm bảo tài khoản được kích hoạt
-            // Các trường khác có thể để trống hoặc giá trị mặc định
+            isActive: true,
         });
 
         await adminUser.save();
@@ -65,11 +61,13 @@ const seedAdmin = async () => {
 
 const run = async () => {
     // Kết nối trực tiếp với MongoDB, sử dụng biến môi trường MONGODB_URI
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/credit_registration')
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/credit_registration')
         .then(() => console.log('MongoDB connected successfully for seeding script'))
         .catch(err => { console.error('MongoDB connection error for seeding script:', err); process.exit(1); });
+    
     await clearData();
     await seedAdmin();
+
     mongoose.disconnect();
     console.log('Đã ngắt kết nối MongoDB.');
 };

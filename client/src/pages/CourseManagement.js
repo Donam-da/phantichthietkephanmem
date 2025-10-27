@@ -17,6 +17,7 @@ const CourseManagement = () => {
   const [editingCourse, setEditingCourse] = useState(null);
   const [hoveredCourseId, setHoveredCourseId] = useState(null);
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
+  const [occupiedSlots, setOccupiedSlots] = useState(new Set());
   const [filters, setFilters] = useState({
     // ... (filters state remains the same)
     semester: '',
@@ -70,7 +71,7 @@ const CourseManagement = () => {
     }
 
     return dates;
-  }, [semesters]);
+  }, [semesters]); // FIX: Add 'semesters' to the dependency array
 
   // Fetch static data like subjects, teachers, semesters, classrooms once
   useEffect(() => {
@@ -96,9 +97,13 @@ const CourseManagement = () => {
         // Set default semester filter if not set
         if (semestersRes.data.length > 0) {
           setFilters(prev => ({ ...prev, semester: prev.semester || semestersRes.data[0]._id }));
+        } else {
+          // FIX: If there are no semesters, stop loading and show an empty state.
+          setLoading(false);
         }
       } catch (error) {
         toast.error('Lỗi khi tải dữ liệu nền.');
+        setLoading(false); // Also stop loading on error
       }
     };
     fetchStaticData();
@@ -109,11 +114,15 @@ const CourseManagement = () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      params.append('semester', filters.semester);
+      if (filters.semester) params.append('semester', filters.semester);
+      // FIX: If user is a teacher, add the teacher filter to the main API call
+      if (isTeacher) {
+        params.append('teacher', user.id);
+      }
       const courseApiUrl = `/api/courses?${params.toString()}`;
       const coursesRes = await api.get(courseApiUrl);
 
-      let fetchedCourses = coursesRes.data.courses;
+      let fetchedCourses = coursesRes.data.courses || []; // FIX: Ensure fetchedCourses is always an array
 
       // If the user is a teacher, sort their courses to the top
       if (isTeacher) {
@@ -131,7 +140,7 @@ const CourseManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters.semester, isTeacher, user]);
+  }, [filters.semester, isTeacher, user?.id]); // FIX: Depend on user.id for stability
 
   // Fetch courses whenever the semester filter changes
   useEffect(() => {
@@ -142,6 +151,29 @@ const CourseManagement = () => {
     setCourses([]); // Clear current courses to show loading state
     fetchCourses();
   };
+
+  // Effect to calculate occupied slots for the form
+  useEffect(() => {
+    if (!showForm || !formData.semester) {
+      setOccupiedSlots(new Set());
+      return;
+    }
+
+    const newOccupiedSlots = new Set();
+    courses
+      .filter(c => c.semester?._id === formData.semester)
+      // When editing, exclude the current course's own schedule from the conflict check
+      .filter(c => !editingCourse || c._id !== editingCourse._id)
+      .forEach(course => {
+        course.schedule.forEach(slot => {
+          if (slot.classroom?._id) {
+            const key = `${slot.dayOfWeek}-${slot.period}-${slot.classroom._id}`;
+            newOccupiedSlots.add(key);
+          }
+        });
+      });
+    setOccupiedSlots(newOccupiedSlots);
+  }, [formData.semester, courses, editingCourse, showForm]);
   const handleFilterChange = (e) => {
     setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -577,8 +609,14 @@ const CourseManagement = () => {
                       <div className="col-span-3">
                         <label className="block text-sm font-medium text-gray-700">Phòng</label>
                         <select value={item.classroom} onChange={(e) => handleScheduleChange(index, 'classroom', e.target.value)} className="mt-1 input-field">
-                          <option value="">Chọn phòng</option>
-                          {classrooms.map(cr => <option key={cr._id} value={cr._id}>{cr.roomCode}</option>)}
+                          <option value="">Chọn phòng</option>                          
+                          {classrooms.map(cr => {
+                            const slotKey = `${item.dayOfWeek}-${item.period}-${cr._id}`;
+                            const isOccupied = occupiedSlots.has(slotKey);
+                            return (
+                              <option key={cr._id} value={cr._id} disabled={isOccupied} className={isOccupied ? 'text-red-400' : ''}>{cr.roomCode} {isOccupied ? '(Đã có lịch)' : ''}</option>
+                            );
+                          })}
                         </select>
                       </div>
                       <div className="col-span-1 flex items-end">

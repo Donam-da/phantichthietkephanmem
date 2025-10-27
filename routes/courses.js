@@ -39,14 +39,14 @@ router.get('/', async (req, res) => {
             .skip(skip)
             .limit(parseInt(limit));
 
-        const total = await Course.countDocuments(filter);
+        const total = await Course.countDocuments(filter); // Giữ lại dòng này
 
         res.json({
             courses,
             pagination: {
                 current: parseInt(page),
                 pages: Math.ceil(total / limit),
-                total
+                total,
             }
         });
     } catch (error) {

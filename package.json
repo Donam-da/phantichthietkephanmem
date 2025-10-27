@@ -8,8 +8,9 @@
     "dev": "nodemon server.js",
     "client": "cd client && npm start",
     "build": "cd client && npm run build",
-    "install-client": "cd client && npm install",
-    "heroku-postbuild": "npm run install-client && npm run build"
+    "install-client": "cd client && npm install", "heroku-postbuild": "npm run install-client && npm run build",
+    "seed": "node scripts/clearAndSeedAdmin.js",
+    "fix:index": "node scripts/fixCourseIndex.js"
   },
   "keywords": [
     "education",
