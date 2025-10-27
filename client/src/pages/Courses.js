@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Search,
@@ -7,7 +6,7 @@ import {
   BookOpen,
   Users,
   Calendar,
-  Eye,
+  Eye
 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -15,6 +14,7 @@ import toast from 'react-hot-toast';
 const Courses = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [myRegistrations, setMyRegistrations] = useState([]);
   const [semesters, setSemesters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,6 +26,9 @@ const Courses = () => {
   const [showScheduleDetailModal, setShowScheduleDetailModal] = useState(false);
   const [selectedCourseForSchedule, setSelectedCourseForSchedule] = useState(null);
   const [modalMode, setModalMode] = useState('view'); // 'view' or 'register'
+  // State to hold registration status for the selected course
+  const [registrationForThisSubject, setRegistrationForThisSubject] = useState(null);
+  const [isThisCourseRegistered, setIsThisCourseRegistered] = useState(false);
 
   const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
   const periodNames = { 1: 'Ca 1 (6h45-9h25)', 2: 'Ca 2 (9h40-12h10)', 3: 'Ca 3 (13h-15h30)', 4: 'Ca 4 (15h45-18h25)' };
@@ -33,17 +36,28 @@ const Courses = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const semestersRes = await api.get('/api/semesters?isActive=true');
-        setSemesters(semestersRes.data);
-        if (semestersRes.data.length > 0) {
-          setFilters(prev => ({ ...prev, semester: semestersRes.data[0]._id }));
+        const apiCalls = [api.get('/api/semesters?isActive=true')];
+        if (user?.role === 'student') {
+          apiCalls.push(api.get('/api/registrations'));
+        }
+
+        const [semestersRes, regsRes] = await Promise.all(apiCalls);
+
+        if (semestersRes.data) {
+          setSemesters(semestersRes.data);
+          if (semestersRes.data.length > 0) {
+            setFilters(prev => ({ ...prev, semester: semestersRes.data[0]._id }));
+          }
+        }
+        if (regsRes && regsRes.data) {
+          setMyRegistrations(regsRes.data.registrations);
         }
       } catch (error) {
         toast.error('Không thể tải danh sách học kỳ.');
       }
     };
     fetchInitialData();
-  }, []);
+  }, [user?.role]); // Keep user?.role as the primary dependency
 
   const getDatesForDayOfWeek = useCallback((semesterId, dayOfWeek) => {
     if (!semesterId || !dayOfWeek) return [];
@@ -87,8 +101,8 @@ const Courses = () => {
 
       if (filters.semester) params.append('semester', filters.semester);
 
-      const response = await api.get(`/api/courses?${params.toString()}`);
-      setCourses(response.data.courses);
+      const coursesRes = await api.get(`/api/courses?${params.toString()}`);
+      setCourses(coursesRes.data.courses);
     } catch (error) {
       console.error('Error fetching courses:', error);
       toast.error('Không thể tải danh sách khóa học');
@@ -115,6 +129,16 @@ const Courses = () => {
   const handleRegisterClick = (e, course) => {
     e.stopPropagation();
     setModalMode('register');
+
+    // Calculate registration status for the clicked course
+    const regForSubject = myRegistrations.find(
+      reg => reg.course?.subject?._id === course.subject?._id && ['pending', 'approved'].includes(reg.status)
+    );
+    const isCourseRegistered = regForSubject && regForSubject.course?._id === course._id;
+
+    setRegistrationForThisSubject(regForSubject);
+    setIsThisCourseRegistered(isCourseRegistered);
+
     setSelectedCourseForSchedule(course);
     setShowScheduleDetailModal(true);
   };
@@ -129,17 +153,17 @@ const Courses = () => {
     }
 
     try {
-      const response = await api.post('/api/registrations', {
+      await api.post('/api/registrations', {
         courseId: selectedCourseForSchedule._id,
         semesterId: selectedCourseForSchedule.semester._id
       });
 
       toast.success('Đăng ký khóa học thành công!');
       setShowScheduleDetailModal(false);
-      // Optionally, you can refetch courses to update student count, or update locally
+      fetchCourses(); // Refetch to update UI
     } catch (error) {
       console.error('Error registering for course:', error);
-      if (error.response && error.response.status === 409 && error.response.data.conflictType === 'SUBJECT_DUPLICATE') {
+      if (error.response && error.response.status === 409 && error.response.data.conflictType === 'SUBJECT_DUPLICATE' && error.response.data.existingRegistrationId) {
         // Handle the specific case of switching course sections
         if (window.confirm(error.response.data.message)) {
           handleSwitchCourse(error.response.data.existingRegistrationId, selectedCourseForSchedule._id);
@@ -159,6 +183,7 @@ const Courses = () => {
       });
       toast.success('Chuyển lớp thành công!', { id: toastId });
       setShowScheduleDetailModal(false);
+      fetchCourses(); // Refetch to update UI
       // You might want to navigate to my-registrations or refresh the current view
     } catch (error) {
       console.error('Error switching course:', error);
@@ -324,6 +349,15 @@ const Courses = () => {
           {filteredCourses.map((course) => {
             const isForMySchool = !user.school?._id || course.subject?.schools?.includes(user.school._id);
 
+            const registrationForThisSubject = myRegistrations.find(
+              reg => reg.course?.subject?._id === course.subject?._id && ['pending', 'approved'].includes(reg.status)
+            );
+
+            const isThisCourseRegistered = registrationForThisSubject && registrationForThisSubject.course?._id === course._id;
+
+            const buttonText = isThisCourseRegistered ? 'Đã đăng ký' : registrationForThisSubject ? 'Đổi lớp' : 'Đăng ký';
+            const buttonDisabled = !course.isActive || isThisCourseRegistered;
+
             return (
             <div 
               key={course._id} 
@@ -385,11 +419,11 @@ const Courses = () => {
                   {isForMySchool && (
                     <button
                       type="button"
-                      onClick={(e) => handleRegisterClick(e, course)}
-                      disabled={!course.isActive}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      onClick={(e) => handleRegisterClick(e, course)} // This will now handle both register and switch
+                      disabled={buttonDisabled}
+                      className={`flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white ${isThisCourseRegistered ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      Đăng ký
+                      {buttonText}
                     </button>
                   )}
                 </div>
@@ -472,7 +506,9 @@ const Courses = () => {
               {modalMode === 'register' ? (
                 <>
                   <p className="text-sm text-gray-700">
-                    Bạn có chắc chắn muốn đăng ký học phần này không?
+                    {registrationForThisSubject && !isThisCourseRegistered
+                      ? `Bạn có muốn đổi từ lớp ${registrationForThisSubject.course.classCode} sang lớp này không?`
+                      : 'Bạn có chắc chắn muốn đăng ký học phần này không?'}
                   </p>
                   <div className="flex gap-2">
                     <button

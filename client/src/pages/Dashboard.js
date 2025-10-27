@@ -10,7 +10,8 @@ import {
   GraduationCap,
   AlertCircle,
   CheckCircle
-} from 'lucide-react';
+} from 'lucide-react'; // Giữ lại dòng này
+import { Clock as ClockIcon } from 'lucide-react'; // Đổi tên Clock để tránh trùng lặp
 import api from '../services/api';
 
 const Dashboard = () => {
@@ -23,6 +24,7 @@ const Dashboard = () => {
     currentCredits: 0,
     maxCredits: 24
   });
+  const [currentSemester, setCurrentSemester] = useState(null);
   const [recentRegistrations, setRecentRegistrations] = useState([]);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +45,7 @@ const Dashboard = () => {
           const [registrationsRes, coursesRes, semesterRes] = await Promise.all([
             api.get('/api/registrations'),
             api.get('/api/courses'),
-            api.get('/api/semesters/current') // Fetch current semester data
+            api.get('/api/semesters/current')
           ]);
 
           const registrations = registrationsRes.data.registrations;
@@ -64,6 +66,7 @@ const Dashboard = () => {
             currentCredits: approvedCredits,
             maxCredits: currentSemester?.maxCreditsPerStudent || user.maxCredits || 24
           });
+          setCurrentSemester(currentSemester);
 
           setRecentRegistrations(registrations.slice(0, 5));
         }
@@ -135,6 +138,35 @@ const Dashboard = () => {
           {user?.role === 'student' && user?.year && user?.semester && `Năm ${user.year} • Học kỳ ${user.semester}`}
         </p>
       </div>
+
+      {/* Registration Period Info */}
+      {user?.role === 'student' && currentSemester && (
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
+          <div className="flex items-center">
+            <ClockIcon className="h-6 w-6 text-blue-600 mr-3" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Thời gian đăng ký học phần</h3>
+              {currentSemester.registrationOpen ? (
+                <p className="text-gray-700 mt-1">
+                  Học kỳ <span className="font-medium">{currentSemester.name} ({currentSemester.academicYear})</span> đang mở đăng ký.
+                  <br />
+                  Từ <span className="font-semibold text-green-600">{new Date(currentSemester.registrationStartDate).toLocaleDateString('vi-VN')}</span>
+                  {' đến '}
+                  <span className="font-semibold text-red-600">{new Date(currentSemester.registrationEndDate).toLocaleDateString('vi-VN')}</span>.
+                </p>
+              ) : (
+                <p className="text-gray-700 mt-1">
+                  Hiện tại không có học kỳ nào đang mở đăng ký.
+                  {currentSemester.registrationStartDate && new Date() < new Date(currentSemester.registrationStartDate) && (
+                    <> Đăng ký sẽ mở vào ngày <span className="font-semibold">{new Date(currentSemester.registrationStartDate).toLocaleDateString('vi-VN')}</span>.</>
+                  )}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

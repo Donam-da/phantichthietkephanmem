@@ -72,7 +72,7 @@ router.post('/', [
     return res.status(400).json({ msg: errors.array()[0].msg });
   }
 
-  const { fullName, email, password, role } = req.body;
+  const { fullName, email, password, role, studentId, school } = req.body;
 
   try {
     // Tách fullName thành firstName và lastName
@@ -85,14 +85,24 @@ router.post('/', [
       return res.status(400).json({ msg: 'Email đã tồn tại' });
     }
 
+    if (role === 'student' && studentId) {
+        const existingStudent = await User.findOne({ studentId });
+        if (existingStudent) {
+            return res.status(400).json({ msg: 'Mã sinh viên đã tồn tại' });
+        }
+    }
+
     user = new User({
       firstName,
       lastName,
       email,
       password, // Password will be hashed by the pre-save hook in the User model
       role,
-      // For student, other fields like major, year, semester would be needed
-      // For this admin-creation, we assume creating non-student roles is simpler
+      studentId: role === 'student' ? studentId : undefined,
+      school: role === 'student' ? school : undefined,
+      // Mặc định năm 1, học kỳ 1 cho sinh viên mới
+      year: role === 'student' ? 1 : undefined,
+      semester: role === 'student' ? 1 : undefined,
     });
 
     await user.save();

@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { Plus } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const UserManagement = () => {
-  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [schools, setSchools] = useState([]);
+  const [createFormData, setCreateFormData] = useState({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '' });
 
   useEffect(() => {
     fetchUsers();
+    fetchSchools();
   }, []);
 
   const fetchUsers = async () => {
@@ -38,6 +41,14 @@ const UserManagement = () => {
     }
   };
 
+  const fetchSchools = async () => {
+    try {
+      const res = await api.get('/api/schools');
+      setSchools(res.data);
+    } catch (error) {
+      toast.error('Không thể tải danh sách trường.');
+    }
+  };
   const handleToggleActive = async (userId, isActive) => {
     try {
       await api.put(`/api/users/${userId}`, { isActive: !isActive });
@@ -67,6 +78,25 @@ const UserManagement = () => {
     setSelectedUser(null);
   };
 
+  const handleCreateFormChange = (e) => {
+    setCreateFormData({ ...createFormData, [e.target.name]: e.target.value });
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    const toastId = toast.loading('Đang tạo người dùng...');
+    try {
+      await api.post('/api/users', createFormData);
+      toast.success('Tạo người dùng thành công!', { id: toastId });
+      setShowCreateModal(false);
+      setCreateFormData({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '' });
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.msg || 'Lỗi khi tạo người dùng.', { id: toastId });
+    }
+  };
+
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -86,8 +116,12 @@ const UserManagement = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Quản lý người dùng</h1>
-
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-900">Quản lý người dùng</h1>
+          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary flex items-center gap-2">
+            <Plus size={18} /> Tạo người dùng
+          </button>
+        </div>
         <div className="flex gap-4 mb-4">
           <input
             type="text"
@@ -163,6 +197,67 @@ const UserManagement = () => {
           ))}
         </ul>
       </div>
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Tạo người dùng mới</h3>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div>
+                <label className="form-label">Vai trò</label>
+                <select name="role" value={createFormData.role} onChange={handleCreateFormChange} className="input-field">
+                  <option value="student">Sinh viên</option>
+                  <option value="teacher">Giảng viên</option>
+                  <option value="admin">Quản trị viên</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Họ và tên</label>
+                <input type="text" name="fullName" value={createFormData.fullName} onChange={handleCreateFormChange} className="input-field" required />
+              </div>
+              <div>
+                <label className="form-label">Email</label>
+                <input type="email" name="email" value={createFormData.email} onChange={handleCreateFormChange} className="input-field" required />
+              </div>
+              <div>
+                <label className="form-label">Mật khẩu</label>
+                <input type="password" name="password" value={createFormData.password} onChange={handleCreateFormChange} className="input-field" required />
+              </div>
+              {createFormData.role === 'student' && (
+                <>
+                  <div>
+                    <label className="form-label">Mã sinh viên</label>
+                    <input type="text" name="studentId" value={createFormData.studentId} onChange={handleCreateFormChange} className="input-field" required />
+                  </div>
+                  <div>
+                    <label className="form-label">Trường</label>
+                    <select name="school" value={createFormData.school} onChange={handleCreateFormChange} className="input-field" required>
+                      <option value="">Chọn trường</option>
+                      {schools.map(s => <option key={s._id} value={s._id}>{s.schoolName}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-end space-x-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                >
+                  Tạo mới
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Detail Modal */}
       {showDetailModal && (

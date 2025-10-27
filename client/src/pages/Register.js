@@ -30,6 +30,12 @@ const Register = () => {
     watch
   } = useForm();
 
+  // Chuyển hướng người dùng về trang đăng nhập vì không cho phép tự đăng ký
+  useEffect(() => {
+    toast('Chức năng tự đăng ký đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được cấp tài khoản.', { icon: 'ℹ️' });
+    navigate('/login');
+  }, [navigate]);
+
   useEffect(() => {
     // This page doesn't need school selection anymore, but keeping the structure
     // in case other dropdowns are needed in the future.
