@@ -1,13 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, Edit, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
+// Moved outside component to prevent re-declaration on every render
 const roomTypeNames = {
     computer_lab: 'Phòng máy',
-    regular: 'Phòng học thường',
+    theory: 'Lý thuyết',
+    lab: 'Thực hành',
     lecture_hall: 'Giảng đường',
 };
+
+// Moved outside component
+const getAuthHeaders = () => ({ headers: { 'x-auth-token': localStorage.getItem('token') } });
 
 const ManageClassrooms = () => {
     const [classrooms, setClassrooms] = useState([]);
@@ -18,11 +23,9 @@ const ManageClassrooms = () => {
         building: '',
         floor: '',
         roomNumber: '',
-        roomType: 'regular',
+        roomType: 'theory',
         capacity: '',
     });
-
-    const getAuthHeaders = () => ({ headers: { 'x-auth-token': localStorage.getItem('token') } });
 
     const fetchClassrooms = useCallback(async () => {
         setIsLoading(true);
@@ -42,16 +45,16 @@ const ManageClassrooms = () => {
 
     const handleInputChange = (e) => {
         const { name, value, type } = e.target;
-        setFormData({ ...formData, [name]: type === 'number' ? parseInt(value) : value });
+        setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value) || '' : value }));
     };
 
     const openModal = (classroom = null) => {
         setCurrentClassroom(classroom);
         setFormData({
-            building: classroom ? classroom.building : '',
-            floor: classroom ? classroom.floor : '',
-            roomNumber: classroom ? classroom.roomNumber : '',
-            roomType: classroom ? classroom.roomType : 'regular',
+            building: classroom ? (classroom.roomCode.match(/A(\d+)/) || [])[1] || '' : '', // x
+            roomNumber: classroom ? (classroom.roomCode.match(/-(\d+)/) || [])[1] || '' : '', // y
+            floor: classroom ? (classroom.roomCode.match(/0(\d+)/) || [])[1] || '' : '', // z
+            roomType: classroom ? classroom.roomType : 'theory',
             capacity: classroom ? classroom.capacity : '',
         });
         setIsModalOpen(true);
@@ -60,16 +63,31 @@ const ManageClassrooms = () => {
     const closeModal = () => {
         setIsModalOpen(false);
         setCurrentClassroom(null);
+        setFormData({
+            building: '',
+            floor: '',
+            roomNumber: '',
+            roomType: 'theory',
+            capacity: '',
+        });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        const { building, floor, roomNumber, roomType, capacity } = formData;
+
+        if (!building || !floor || !roomNumber) {
+            toast.error('Vui lòng điền đủ thông tin Tòa, Tầng, Phòng.');
+            return;
+        }
+
+        const roomCode = `A${building}-${roomNumber}0${floor}`;
         const toastId = toast.loading(currentClassroom ? 'Đang cập nhật...' : 'Đang thêm mới...');
         try {
             if (currentClassroom) {
-                await axios.put(`/api/classrooms/${currentClassroom._id}`, formData, getAuthHeaders());
+                await axios.put(`/api/classrooms/${currentClassroom._id}`, { roomType, capacity }, getAuthHeaders());
             } else {
-                await axios.post('/api/classrooms', formData, getAuthHeaders());
+                await axios.post('/api/classrooms', { roomCode, roomType, capacity }, getAuthHeaders());
             }
             toast.success(currentClassroom ? 'Cập nhật thành công!' : 'Thêm mới thành công!', { id: toastId });
             fetchClassrooms();
@@ -87,81 +105,79 @@ const ManageClassrooms = () => {
                 toast.success('Xóa thành công!', { id: toastId });
                 fetchClassrooms();
             } catch (error) {
-                toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+                // IMPROVEMENT: Provide more specific error message
+                toast.error(error.response?.data?.msg || 'Xóa thất bại. Phòng học có thể đang được sử dụng.', { id: toastId });
             }
         }
     };
 
     return (
         <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Quản lý Phòng học</h1>
-                <button onClick={() => openModal()} className="btn btn-primary">
-                    <Plus className="h-5 w-5 mr-2" />
+            <div className="mb-6 flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-gray-900">Quản lý Phòng học</h1>
+                <button onClick={() => openModal()} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2">
+                    <Plus size={18} />
                     Thêm Phòng học
                 </button>
             </div>
 
             {isLoading ? <p>Đang tải...</p> : (
-                <div className="bg-white shadow-md rounded-lg overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã Phòng</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại Phòng</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sức chứa</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {classrooms.map((room) => (
-                                <tr key={room._id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{room.roomCode}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{roomTypeNames[room.roomType]}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{room.capacity}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => openModal(room)} className="text-indigo-600 hover:text-indigo-900 mr-4">
-                                            <Edit className="h-5 w-5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(room._id)} className="text-red-600 hover:text-red-900">
-                                            <Trash2 className="h-5 w-5" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <ul className="divide-y divide-gray-200">
+                        {classrooms.map((room) => (
+                            <li key={room._id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                                <div>
+                                    <p className="text-sm font-medium text-indigo-600">{room.roomCode}</p>
+                                    <p className="text-sm text-gray-500">Loại: {roomTypeNames[room.roomType] || room.roomType} - Sức chứa: {room.capacity}</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${room.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        {room.isActive ? 'Hoạt động' : 'Không hoạt động'}
+                                    </span>
+                                    <button onClick={() => openModal(room)} className="text-blue-600 hover:text-blue-800"><Edit size={18} /></button>
+                                    <button onClick={() => handleDelete(room._id)} className="text-red-600 hover:text-red-800"><Trash2 size={18} /></button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
-                            {currentClassroom ? 'Chỉnh sửa Phòng học' : 'Thêm Phòng học mới'}
-                        </h3>
-                        <form onSubmit={handleSubmit}>
-                            <div className="grid grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Tòa nhà (x)</label>
-                                    <input type="number" name="building" value={formData.building} onChange={handleInputChange} className="mt-1 input-field" min="1" max="8" required disabled={!!currentClassroom} />
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div className="relative p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-medium text-gray-900">{currentClassroom ? 'Chỉnh sửa' : 'Thêm'} Phòng học</h3>
+                            <button onClick={closeModal} className="p-1 rounded-full hover:bg-gray-200">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Mã phòng</label>
+                                <div className="grid grid-cols-3 gap-4 mt-1">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500">Tòa</label>
+                                        <input type="number" name="building" value={formData.building} onChange={handleInputChange} className="input-field" placeholder="1" min="1" max="8" required disabled={!!currentClassroom} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500">Tầng</label>
+                                        <input type="number" name="floor" value={formData.floor} onChange={handleInputChange} className="input-field" placeholder="1" min="1" max="7" required disabled={!!currentClassroom} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500">Phòng</label>
+                                        <input type="number" name="roomNumber" value={formData.roomNumber} onChange={handleInputChange} className="input-field" placeholder="1" min="1" max="7" required disabled={!!currentClassroom} />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Tầng (y)</label>
-                                    <input type="number" name="floor" value={formData.floor} onChange={handleInputChange} className="mt-1 input-field" min="1" max="7" required disabled={!!currentClassroom} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Phòng (z)</label>
-                                    <input type="number" name="roomNumber" value={formData.roomNumber} onChange={handleInputChange} className="mt-1 input-field" min="1" max="6" required disabled={!!currentClassroom} />
-                                </div>
+                                {currentClassroom && <p className="text-sm text-gray-500 mt-2">Mã phòng hiện tại: {currentClassroom.roomCode}</p>}
                             </div>
-                            {currentClassroom && <p className="text-sm text-gray-500 mb-4">Mã phòng: {currentClassroom.roomCode}</p>}
 
-                            <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Loại phòng</label>
                                     <select name="roomType" value={formData.roomType} onChange={handleInputChange} className="mt-1 input-field" required>
-                                        <option value="regular">Phòng học thường</option>
+                                        <option value="theory">Phòng lý thuyết</option>
+                                        <option value="lab">Phòng thực hành</option>
                                         <option value="computer_lab">Phòng máy</option>
                                         <option value="lecture_hall">Giảng đường</option>
                                     </select>
@@ -172,12 +188,12 @@ const ManageClassrooms = () => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-end mt-6">
-                                <button type="button" onClick={closeModal} className="btn btn-secondary mr-3">
+                            <div className="flex justify-end space-x-2 pt-4">
+                                <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
                                     Hủy
                                 </button>
-                                <button type="submit" className="btn btn-primary">
-                                    Lưu
+                                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                                    {currentClassroom ? 'Cập nhật' : 'Tạo mới'}
                                 </button>
                             </div>
                         </form>

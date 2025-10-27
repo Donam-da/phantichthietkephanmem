@@ -7,16 +7,15 @@ const { admin } = require('../middleware/admin');
 // @route   POST api/classrooms
 // @desc    Tạo phòng học mới
 // @access  Private (Admin)
-router.post('/', [auth, admin], async (req, res) => {
-    const { building, floor, roomNumber, roomType, capacity } = req.body;
+router.post('/', [auth, admin], async (req, res) => { // Giữ lại dòng này
+    const { roomCode, roomType, capacity } = req.body;
     try {
-        const roomCode = `A${building}-${floor}0${roomNumber}`;
         let classroom = await Classroom.findOne({ roomCode });
         if (classroom) {
             return res.status(400).json({ msg: 'Phòng học đã tồn tại' });
         }
 
-        classroom = new Classroom({ building, floor, roomNumber, roomType, capacity });
+        classroom = new Classroom({ roomCode, roomType, capacity });
         await classroom.save();
         res.status(201).json(classroom);
     } catch (err) {
