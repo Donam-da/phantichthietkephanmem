@@ -73,6 +73,9 @@ node scripts/clearAndSeedAdmin.js
 
 npm install csv-parser multer
 
+# cài đặt để băm mật khẩu
+npm install bcryptjs
+
 # Cài đặt dependencies cho Backend
 npm install
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
+const bcrypt = require('bcryptjs'); // Thêm dòng này để import bcryptjs
 const User = require('../models/User');
 const Course = require('../models/Course'); // Import Course model
 const verifyAdminPassword = require('../middleware/verifyAdminPassword');
@@ -318,8 +319,10 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
 
     const errors = [];
     const importedTeachers = [];
+    const usersToInsert = []; // Array to hold user objects for bulk insert
     const schoolMap = new Map();
 
+    // Fetch all schools to create a mapping
     try {
         // Lấy tất cả các trường để tạo map
         const allSchools = await School.find().select('_id schoolCode');
@@ -332,6 +335,7 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
         const dataRows = rows.slice(1);
 
         for (const row of dataRows) {
+            const originalRow = row; // Keep original row for error reporting
             const parts = row.split(',');
             const emailForRow = parts.length > 1 ? parts[1].trim() : 'không xác định';
 
@@ -346,7 +350,7 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
             const teachingSchoolsStr = (parts[3] || '').trim(); // Cột thứ 4, tùy chọn
 
             if (!fullName || !email || !password) {
-                errors.push({ row: { email }, msg: 'Thiếu thông tin bắt buộc.' });
+                errors.push({ row: { email: emailForRow }, msg: 'Thiếu thông tin bắt buộc (Họ và tên, email, mật khẩu).' });
                 continue;
             }
 
@@ -358,7 +362,7 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
                 if (schoolMap.has(code)) {
                     schoolIds.push(schoolMap.get(code));
                 } else {
-                    errors.push({ row: { email }, msg: `Mã trường '${code}' không tồn tại.` });
+                    errors.push({ row: { email: emailForRow }, msg: `Mã trường '${code}' không tồn tại.` });
                     allSchoolsFound = false;
                     break;
                 }
@@ -368,35 +372,52 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
             // Kiểm tra email đã tồn tại chưa
             const existingUser = await User.findOne({ email });
             if (existingUser) {
-                errors.push({ row: { email }, msg: `Email '${email}' đã tồn tại.` });
+                errors.push({ row: { email: emailForRow }, msg: `Email '${email}' đã tồn tại.` });
                 continue;
             }
 
             const nameParts = fullName.trim().split(' ');
             const lastName = nameParts.pop() || '';
             const firstName = nameParts.join(' ');
+            
+            // Manually hash password before bulk insert
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(password, salt);
 
+            usersToInsert.push({
+                firstName,
+                lastName,
+                email,
+                password: hashedPassword, // Use hashed password
+                role: 'teacher',
+                teachingSchools: schoolIds,
+                isActive: true, // Default to active
+            });
+        }
+
+        // Perform bulk insert
+        if (usersToInsert.length > 0) {
             try {
-                const newTeacher = new User({
-                    firstName,
-                    lastName,
-                    email,
-                    password,
-                    role: 'teacher',
-                    teachingSchools: schoolIds,
-                });
-
-                await newTeacher.save();
-                importedTeachers.push(newTeacher);
-            } catch (dbErr) {
-                errors.push({ row: { email }, msg: `Lỗi lưu vào DB: ${dbErr.message}` });
+                const result = await User.insertMany(usersToInsert, { ordered: false });
+                importedTeachers.push(...result);
+            } catch (bulkWriteError) {
+                // Handle errors from bulk insert (e.g., duplicate key errors, validation errors)
+                if (bulkWriteError.writeErrors) {
+                    bulkWriteError.writeErrors.forEach(err => {
+                        const emailFromError = usersToInsert[err.index].email;
+                        errors.push({ row: { email: emailFromError }, msg: err.errmsg || err.message });
+                    });
+                } else {
+                    // General error
+                    errors.push({ row: { email: 'unknown' }, msg: bulkWriteError.message });
+                }
             }
         }
 
         fs.unlinkSync(req.file.path); // Xóa tệp tạm
 
-        res.json({
-            msg: `Đã xử lý ${dataRows.length} dòng. Thêm thành công ${importedTeachers.length} giảng viên.`,
+        res.json({ // Use dataRows.length for processedCount
+            msg: `Đã xử lý ${dataRows.length} dòng. Thêm thành công ${importedTeachers.length} giảng viên.`, // Update message
             processedCount: dataRows.length,
             importedCount: importedTeachers.length,
             failedCount: errors.length,
@@ -404,7 +425,11 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
         });
 
     } catch (err) {
+        // Ensure file is unlinked even if an error occurs before bulk insert
         console.error(err.message);
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
         res.status(500).send('Lỗi Server');
     }
 });
