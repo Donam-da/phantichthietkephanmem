@@ -450,7 +450,7 @@ const SemesterManagement = () => {
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
           {semesters.map((semester) => (
-            <li key={semester._id} onClick={() => handleEdit(semester)} className="px-6 py-4 hover:bg-gray-50 cursor-pointer">
+            <li key={semester._id} onDoubleClick={() => handleEdit(semester)} className="px-6 py-4 hover:bg-gray-50 cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">

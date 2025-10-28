@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Star } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -17,6 +15,7 @@ const CourseManagement = () => {
   const [editingCourse, setEditingCourse] = useState(null);
   const [hoveredCourseId, setHoveredCourseId] = useState(null);
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
+  const [statusNote, setStatusNote] = useState(null); // State for status popover
   const [occupiedSlots, setOccupiedSlots] = useState(new Set());
   const [filters, setFilters] = useState({
     // ... (filters state remains the same)
@@ -124,16 +123,6 @@ const CourseManagement = () => {
 
       let fetchedCourses = coursesRes.data.courses || []; // FIX: Ensure fetchedCourses is always an array
 
-      // If the user is a teacher, sort their courses to the top
-      if (isTeacher) {
-        fetchedCourses.sort((a, b) => {
-          const isATeacherCourse = a.teacher?._id === user.id;
-          const isBTeacherCourse = b.teacher?._id === user.id;
-          if (isATeacherCourse && !isBTeacherCourse) return -1;
-          if (!isATeacherCourse && isBTeacherCourse) return 1;
-          return 0; // Keep original order for other cases
-        });
-      }
       setCourses(fetchedCourses);
     } catch (error) {
       toast.error('Lỗi khi tải danh sách lớp học phần.');
@@ -141,6 +130,26 @@ const CourseManagement = () => {
       setLoading(false);
     }
   }, [filters.semester, isTeacher, user?.id]); // FIX: Depend on user.id for stability
+
+  // NEW: Effect to sync course status on component mount for admins
+  useEffect(() => {
+    const syncCourseStatus = async () => {
+      if (user && user.role === 'admin') {
+        try {
+          const res = await api.post('/api/courses/sync-teacher-status');
+          if (res.data.count > 0) {
+            toast.success(`Đã tự động khóa ${res.data.count} lớp học phần không có giảng viên. Đang làm mới...`);
+            // Tải lại danh sách lớp học phần để cập nhật giao diện ngay lập tức
+            fetchCourses();
+          }
+        } catch (error) {
+          console.error("Failed to sync course status:", error);
+          // Không hiển thị lỗi cho người dùng vì đây là tác vụ nền
+        }
+      }
+    };
+    syncCourseStatus();
+  }, [user, fetchCourses]);
 
   // Fetch courses whenever the semester filter changes
   useEffect(() => {
@@ -240,36 +249,6 @@ const CourseManagement = () => {
         teacherScheduleEntries.add(teacherKey);
     }
     // --- END of NEW: Internal Conflict Checking ---
-
-
-    // --- CONFLICT CHECKING LOGIC ---
-    if (!editingCourse) {
-      const { teacher, semester, schedule: newSchedule } = formData;
-      const coursesInSameSemester = courses.filter(c => c.semester?._id === semester);
-
-      for (const scheduleItem of newSchedule) {
-        for (const existingCourse of coursesInSameSemester) {
-          for (const existingSchedule of existingCourse.schedule) {
-            // Check for time slot collision
-            if (scheduleItem.dayOfWeek === existingSchedule.dayOfWeek && scheduleItem.period === existingSchedule.period) {
-              // 1. Teacher conflict
-              if (existingCourse.teacher?._id === teacher) {
-                const teacherName = teachers.find(t => t._id === teacher)?.fullName || 'Giảng viên';
-                toast.error(`${teacherName} đã có lịch dạy vào ${dayOfWeekNames[scheduleItem.dayOfWeek]}, ${periodNames[scheduleItem.period]}.`);
-                return;
-              }
-              // 2. Classroom conflict
-              if (existingSchedule.classroom?._id === scheduleItem.classroom) {
-                const classroomName = classrooms.find(cr => cr._id === scheduleItem.classroom)?.roomCode || 'Phòng học';
-                toast.error(`Phòng ${classroomName} đã được sử dụng vào ${dayOfWeekNames[scheduleItem.dayOfWeek]}, ${periodNames[scheduleItem.period]}.`);
-                return;
-              }
-            }
-          }
-        }
-      }
-    }
-    // --- END OF CONFLICT CHECKING ---
 
     // Validate that at least one classroom is selected in the schedule
     if (formData.schedule.some(s => !s.classroom)) {
@@ -583,8 +562,8 @@ const CourseManagement = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Giảng viên</label>
-                  <select value={formData.teacher} onChange={(e) => setFormData({ ...formData, teacher: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    <option value="">Chọn giảng viên</option>
+                  <select value={formData.teacher} onChange={(e) => setFormData({ ...formData, teacher: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Tạm thời chưa có giảng viên</option>
                     {teachers.map(t => <option key={t._id} value={t._id}>{t.firstName} {t.lastName}</option>)}
                   </select>
                 </div>
@@ -798,6 +777,21 @@ const CourseManagement = () => {
         </div>
       )}
 
+      {/* Status Note Popover */}
+      {statusNote && (
+        <div
+          className="fixed max-w-xs bg-gray-800 text-white text-sm rounded-lg shadow-lg p-3 z-50 pointer-events-none"
+          style={{
+            top: `${popoverPosition.y + 15}px`,
+            left: `${popoverPosition.x + 15}px`,
+            transform: popoverPosition.x > window.innerWidth - 200 ? 'translateX(-100%)' : 'none',
+          }}
+        >
+          {statusNote}
+        </div>
+      )}
+
+
       {/* Hover Popover */}
       {hoveredCourseId && (() => {
           const course = courses.find(c => c._id === hoveredCourseId);
@@ -846,7 +840,7 @@ const CourseManagement = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredCourses.map((course) => ( // Giữ lại dòng này
-                <tr key={course._id} onClick={() => handleEdit(course)} className="hover:bg-gray-50 group cursor-pointer" onMouseEnter={() => setHoveredCourseId(course._id)} onMouseLeave={() => setHoveredCourseId(null)} onMouseMove={handleMouseMove}>
+                <tr key={course._id} onDoubleClick={() => handleEdit(course)} className="hover:bg-gray-50 group cursor-pointer" onMouseEnter={() => setHoveredCourseId(course._id)} onMouseLeave={() => setHoveredCourseId(null)} onMouseMove={handleMouseMove}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="min-w-0">
@@ -858,15 +852,24 @@ const CourseManagement = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{course.teacher?.firstName} {course.teacher?.lastName}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{course.schedule.map((s, i) => (<div key={i}>{dayOfWeekNames[s.dayOfWeek]}, {periodNames[s.period]}</div>))}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{course.currentStudents}/{course.maxStudents}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className="px-6 py-4 whitespace-nowrap text-center" onMouseEnter={(e) => {
+                        if (!course.isActive && course.notes) {
+                          e.stopPropagation(); // Ngăn sự kiện lan ra hàng
+                          setHoveredCourseId(null); // Ẩn popover chi tiết
+                          setStatusNote(course.notes); // Hiện popover lý do
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        // Khi rời khỏi ô trạng thái, hiện lại popover chi tiết
+                        setStatusNote(null);
+                        setHoveredCourseId(course._id);
+                      }}>
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${course.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {course.isActive ? 'Hoạt động' : 'Đã khóa'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end gap-4">
-                      <button onClick={(e) => { e.stopPropagation(); handleClickCourse(e, course); }} className="text-red-600 hover:text-red-800 font-semibold">Xem lịch</button>
-                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); handleClickCourse(e, course); }} className="text-red-600 hover:text-red-800 font-semibold">Xem lịch</button>
                   </td>
                 </tr>
               ))}

@@ -31,18 +31,26 @@ const CourseSchema = new mongoose.Schema({
     teacher: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        // required: false // Teacher is optional, a course can be created without a teacher
     },
     schedule: [ScheduleSchema],
     currentStudents: {
         type: Number,
         default: 0,
-        min: 0
+        min: 0,
+        validate: {
+            validator: function(value) {
+                // `this` refers to the document being validated
+                return value <= this.maxStudents;
+            },
+            message: props => `Số sinh viên hiện tại (${props.value}) không thể lớn hơn sĩ số tối đa.`
+        }
     },
     isActive: {
         type: Boolean,
         default: true
     },
+    notes: { type: String, trim: true } // Add notes field for admin remarks
 }, {
   timestamps: true
 });

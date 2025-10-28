@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Search,
   Filter,
   BookOpen,
   Users,
@@ -28,6 +27,9 @@ const Courses = () => {
   const [modalMode, setModalMode] = useState('view'); // 'view' or 'register'
   // State to hold registration status for the selected course
   const [registrationForThisSubject, setRegistrationForThisSubject] = useState(null);
+  // State for popover
+  const [hoveredNote, setHoveredNote] = useState(null);
+  const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
   const [isThisCourseRegistered, setIsThisCourseRegistered] = useState(false);
 
   const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
@@ -125,6 +127,11 @@ const Courses = () => {
     setSelectedCourseForSchedule(course);
     setShowScheduleDetailModal(true);
   };
+
+  const handleMouseMove = (e) => {
+    setPopoverPosition({ x: e.clientX, y: e.clientY });
+  };
+
 
   const handleRegisterClick = (e, course) => {
     e.stopPropagation();
@@ -373,7 +380,16 @@ const Courses = () => {
                     </h3>
                     <p className="text-sm text-gray-500">{course.subject?.subjectCode} - {course.classCode}</p>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${course.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  <span 
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${course.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                    onMouseEnter={(e) => {
+                      if (!course.isActive && course.notes) {
+                        handleMouseMove(e);
+                        setHoveredNote(course.notes);
+                      }
+                    }}
+                    onMouseLeave={() => setHoveredNote(null)}
+                  >
                     {course.isActive ? 'Đang mở' : 'Đã đóng'}
                   </span>
                 </div>
@@ -449,6 +465,21 @@ const Courses = () => {
           </p>
         </div>
       )}
+
+      {/* Note Popover */}
+      {hoveredNote && (
+        <div
+          className="fixed max-w-xs bg-gray-800 text-white text-sm rounded-lg shadow-lg p-3 z-50 pointer-events-none"
+          style={{
+            top: `${popoverPosition.y + 15}px`,
+            left: `${popoverPosition.x + 15}px`,
+            transform: popoverPosition.x > window.innerWidth - 200 ? 'translateX(-100%)' : 'none',
+          }}
+        >
+          {hoveredNote}
+        </div>
+      )}
+
 
       {/* Detailed Schedule Modal */}
       {showScheduleDetailModal && selectedCourseForSchedule && (

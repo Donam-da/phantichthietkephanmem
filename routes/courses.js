@@ -89,7 +89,7 @@ router.post('/', [
     body('classCode', 'Mã lớp là bắt buộc').not().isEmpty(),
     body('maxStudents', 'Sĩ số tối đa là bắt buộc').isInt({ min: 1 }),
     body('semester', 'Học kỳ là bắt buộc').isMongoId(),
-    body('teacher', 'Teacher is required').isMongoId(),
+    body('teacher', 'Teacher ID must be a valid Mongo ID if provided').optional({ checkFalsy: true }).isMongoId(),
     body('schedule', 'Lịch học là bắt buộc').isArray({ min: 1 }),
 ], async (req, res) => {
     try {
@@ -98,14 +98,30 @@ router.post('/', [
             return res.status(400).json({ errors: errors.array() });
         }
 
-        const { subject, classCode, semester } = req.body;
+        const { subject, classCode, semester, teacher } = req.body;
 
         const existingCourse = await Course.findOne({ subject, classCode, semester });
         if (existingCourse) {
             return res.status(400).json({ msg: 'Mã lớp đã tồn tại cho môn học này trong học kỳ này.' });
         }
 
-        const course = new Course(req.body);
+        const newCourseData = { ...req.body };
+        // Automatically set isActive to false if no teacher is assigned
+        // If a teacher is assigned, it can be active (true by default). If not, it must be inactive.
+        // This allows an admin to create an active course with a teacher, or an inactive one without.
+        // The `!!teacher` converts the teacher ID (or lack thereof) to a boolean.
+
+        // Explicitly set to false if no teacher, overriding any potential `isActive: true` in the request body.
+        if (!teacher) {
+            newCourseData.isActive = false;
+            newCourseData.notes = "Lớp tạm khóa do chưa có giảng viên.";
+            // Instead of setting to null, remove the key if it's falsy (empty string)
+            delete newCourseData.teacher;
+        } else {
+            newCourseData.isActive = true; // Default to active if a teacher is assigned
+        }
+
+        const course = new Course(newCourseData);
         await course.save();
 
         await course.populate([
@@ -132,11 +148,17 @@ router.put('/:id', [auth, admin], async (req, res) => {
             return res.status(404).json({ msg: 'Không tìm thấy lớp học phần' });
         }
 
-        const { maxStudents, teacher, schedule, isActive } = req.body;
+        const { maxStudents, teacher, schedule, notes } = req.body;
+        let { isActive } = req.body; // Giữ lại dòng này
+
+        // If a teacher is removed, the course must be deactivated.
+        // If a teacher is present, isActive can be what the user sent.
+        const finalIsActive = !!teacher && isActive; // Course is active ONLY IF a teacher is present AND isActive is true.
+        const finalNotes = !teacher ? "Lớp tạm khóa do thiếu giảng viên." : notes;
 
         const updatedCourse = await Course.findByIdAndUpdate(
             req.params.id,
-            { maxStudents, teacher, schedule, isActive },
+            { maxStudents, teacher, schedule, isActive: finalIsActive, notes: finalNotes },
             { new: true, runValidators: true }
         )
             .populate('subject', 'subjectCode subjectName credits')
@@ -191,6 +213,31 @@ router.delete('/:id', [auth, admin], async (req, res) => {
             return res.status(404).json({ msg: 'Không tìm thấy lớp học phần' });
         }
         res.status(500).json({ msg: 'Lỗi Server' });
+    }
+});
+
+// @route   POST /api/courses/sync-teacher-status
+// @desc    Deactivate active courses that have no teacher
+// @access  Private (Admin only)
+router.post('/sync-teacher-status', [auth, admin], async (req, res) => {
+    try {
+        const result = await Course.updateMany(
+            { 
+                teacher: null,      // Find courses where teacher is not set
+                isActive: true      // and the course is currently active
+            },
+            { 
+                $set: { 
+                    isActive: false, 
+                    notes: "Lớp tạm khóa do thiếu giảng viên." 
+                } 
+            }
+        );
+
+        res.json({ message: `Đồng bộ hóa thành công. Đã cập nhật ${result.modifiedCount} lớp học phần.`, count: result.modifiedCount });
+    } catch (error) {
+        console.error('Error syncing course status:', error.message);
+        res.status(500).json({ msg: 'Lỗi Server khi đồng bộ hóa trạng thái lớp học phần.' });
     }
 });
 
