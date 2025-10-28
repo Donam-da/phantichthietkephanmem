@@ -67,6 +67,7 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Khóa học', href: '/courses', icon: BookOpen },
         { name: 'Đăng ký của tôi', href: '/my-registrations', icon: ClipboardList },
+        { name: 'Thời khóa biểu', href: '/schedule', icon: Calendar },
         ...baseNav
       ]
     };
