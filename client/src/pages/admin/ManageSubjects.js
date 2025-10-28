@@ -16,6 +16,7 @@ const ManageSubjects = () => {
         credits: '',
         schools: [],
         category: 'required',
+        preferredRoomTypes: ['theory'], // Thêm trường mới
     });
     // State cho bộ lọc và tìm kiếm
     const [filters, setFilters] = useState({
@@ -76,6 +77,17 @@ const ManageSubjects = () => {
         }
     };
 
+    const handleRoomTypeChange = (roomType) => {
+        setFormData(prev => {
+            const newRoomTypes = prev.preferredRoomTypes.includes(roomType)
+                ? prev.preferredRoomTypes.filter(rt => rt !== roomType)
+                : [...prev.preferredRoomTypes, roomType];
+            // Ensure at least one room type is selected
+            if (newRoomTypes.length === 0) return prev;
+            return { ...prev, preferredRoomTypes: newRoomTypes };
+        });
+    };
+
     const openModal = (subject = null) => {
         setCurrentSubject(subject);
         setFormData({
@@ -84,6 +96,7 @@ const ManageSubjects = () => {
             credits: subject ? subject.credits : '',
             schools: subject ? subject.schools.map(s => s._id) : [],
             category: subject ? subject.category : 'required',
+            preferredRoomTypes: subject ? subject.preferredRoomTypes : ['theory'],
         });
         setIsModalOpen(true);
     };
@@ -254,6 +267,12 @@ const ManageSubjects = () => {
         }
     };
 
+    const roomTypeNames = {
+        computer_lab: 'Phòng máy',
+        theory: 'Lý thuyết',
+        lab: 'Thực hành',
+        lecture_hall: 'Giảng đường',
+    };
     // Lấy danh sách số tín chỉ duy nhất từ các môn học đã có để hiển thị trong bộ lọc
     const uniqueCredits = [...new Set(subjects.map(s => s.credits))].sort((a, b) => a - b);
 
@@ -348,6 +367,7 @@ const ManageSubjects = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Tên Môn học</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Số TC</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Các trường</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Loại phòng</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-red-800 uppercase tracking-wider">Hành động</th>
                             </tr>
                         </thead>
@@ -362,6 +382,9 @@ const ManageSubjects = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">{subject.credits}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                         {subject.schools.map(s => s.schoolCode).join(', ')}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                                        {subject.preferredRoomTypes?.map(rt => roomTypeNames[rt] || rt).join(', ') || 'Lý thuyết'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button onClick={(e) => { e.stopPropagation(); openModal(subject); }} className="text-indigo-600 hover:text-indigo-900">
@@ -397,17 +420,36 @@ const ManageSubjects = () => {
                                 <input type="text" name="subjectName" value={formData.subjectName} onChange={handleInputChange} className="mt-1 input-field" required />
                             </div>
                             <div className="mb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Loại môn</label>
+                                        <select name="category" value={formData.category} onChange={handleInputChange} className="mt-1 input-field w-full" required>
+                                            <option value="required">Bắt buộc</option>
+                                            <option value="elective">Tự chọn</option>
+                                            <option value="general">Đại cương</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Loại phòng ưu tiên (chọn một hoặc nhiều)</label>
+                                        <div className="mt-2 grid grid-cols-2 gap-2">
+                                            {Object.entries(roomTypeNames).map(([value, name]) => (
+                                                <div key={value} className="flex items-center">
+                                                    <input
+                                                        id={`room-type-${value}`}
+                                                        name="preferredRoomTypes"
+                                                        type="checkbox"
+                                                        checked={formData.preferredRoomTypes.includes(value)}
+                                                        onChange={() => handleRoomTypeChange(value)}
+                                                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                                    <label htmlFor={`room-type-${value}`} className="ml-2 block text-sm text-gray-700">{name}</label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mb-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Loại môn</label>
-                                    <select
-                                        name="category"
-                                        value={formData.category}
-                                        onChange={handleInputChange}
-                                        className="mt-1 input-field w-full" required>
-                                        <option value="required">Bắt buộc</option>
-                                        <option value="elective">Tự chọn</option>
-                                        <option value="general">Đại cương</option>
-                                    </select>
                                 </div>
                             </div>
                             <div className="mb-4">
@@ -468,7 +510,7 @@ const ManageSubjects = () => {
                                     required
                                 />
                                 <p className="mt-2 text-xs text-gray-500">
-                                    Các cột: `subjectCode`, `subjectName`, `credits`, `schools`, `category`. Các mã trường trong cột `schools` phải cách nhau bởi dấu chấm phẩy (;).
+                                    Các cột: `subjectCode`, `subjectName`, `credits`, `schools`, `category`, `preferredRoomTypes` (tùy chọn). Các giá trị trong cột `schools` và `preferredRoomTypes` phải cách nhau bởi dấu chấm phẩy (;).
                                 </p>
                             </div>
 

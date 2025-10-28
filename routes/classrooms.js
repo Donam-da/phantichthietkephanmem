@@ -152,7 +152,7 @@ router.post('/import', [auth, admin, upload.single('file')], async (req, res) =>
             }
 
             // Ghép thành mã phòng
-            const roomCode = `A${building}-${roomNumber}0${floor}`;
+            const roomCode = `A${building}-${floor}0${roomNumber}`;
 
             // Kiểm tra loại phòng hợp lệ
             const validRoomTypes = ['theory', 'lab', 'computer_lab', 'lecture_hall'];

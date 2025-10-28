@@ -28,7 +28,14 @@ const SubjectSchema = new mongoose.Schema({
         type: String,
         enum: ['required', 'elective', 'general'],
         required: true
-    }
+    },
+    preferredRoomTypes: {
+        type: [{
+            type: String,
+            enum: ['theory', 'lab', 'computer_lab', 'lecture_hall'],
+        }],
+        default: ['theory']
+    },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Subject', SubjectSchema);

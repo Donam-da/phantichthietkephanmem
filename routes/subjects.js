@@ -23,13 +23,14 @@ router.post('/', [
     body('credits', 'Số tín chỉ là bắt buộc và phải là số').isInt({ min: 0 }),
     body('schools', 'Vui lòng chọn ít nhất một trường').isArray({ min: 1 }),
     body('category', 'Loại môn học là bắt buộc').isIn(['required', 'elective', 'general']),
+    body('preferredRoomTypes', 'Loại phòng ưu tiên không hợp lệ').optional().isArray(),
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { subjectCode, subjectName, credits, schools, category } = req.body;
+    const { subjectCode, subjectName, credits, schools, category, preferredRoomTypes } = req.body;
     try {
         if (!schools || schools.length === 0) {
             return res.status(400).json({ msg: 'Vui lòng chọn ít nhất một trường' });
@@ -40,7 +41,7 @@ router.post('/', [
             return res.status(400).json({ msg: 'Mã môn học đã tồn tại' });
         }
 
-        subject = new Subject({ subjectCode, subjectName, credits, schools, category });
+        subject = new Subject({ subjectCode, subjectName, credits, schools, category, preferredRoomTypes });
         await subject.save();
         await subject.populate('schools', 'schoolCode schoolName');
         res.status(201).json(subject);
@@ -72,14 +73,15 @@ router.put('/:id', [
     body('subjectName', 'Tên môn học là bắt buộc').optional().not().isEmpty(),
     body('credits', 'Số tín chỉ là bắt buộc và phải là số').optional().isInt({ min: 0 }),
     body('schools', 'Vui lòng chọn ít nhất một trường').optional().isArray({ min: 1 }),
-    body('category', 'Loại môn học là bắt buộc').optional().isIn(['required', 'elective', 'general']),    
+    body('category', 'Loại môn học là bắt buộc').optional().isIn(['required', 'elective', 'general']),
+    body('preferredRoomTypes', 'Loại phòng ưu tiên không hợp lệ').optional().isArray(),
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { subjectName, credits, schools, category } = req.body;
+    const { subjectName, credits, schools, category, preferredRoomTypes } = req.body;
     try {
         let subject = await Subject.findById(req.params.id);
         if (!subject) return res.status(404).json({ msg: 'Không tìm thấy môn học' });
@@ -89,6 +91,7 @@ router.put('/:id', [
         if (credits !== undefined) subject.credits = credits;
         if (schools) subject.schools = schools;
         if (category) subject.category = category;
+        if (preferredRoomTypes) subject.preferredRoomTypes = preferredRoomTypes;
 
         await subject.save();
         await subject.populate('schools', 'schoolCode schoolName');
@@ -166,8 +169,10 @@ router.post('/import', [auth, admin, upload.single('file')], async (req, res) =>
 
         for (const row of dataRows) {
             const parts = row.split(',');
-            if (parts.length < 5) {
-                errors.push({ row, msg: 'Dòng không đủ 5 cột dữ liệu bắt buộc.' });
+            const subjectCodeForRow = parts.length > 0 ? parts[0].trim() : 'không xác định';
+
+            if (parts.length < 5) { // Cần ít nhất 5 cột
+                errors.push({ row: { subjectCode: subjectCodeForRow }, msg: 'Dòng không đủ 5 cột dữ liệu bắt buộc.' });
                 continue;
             }
 
@@ -177,24 +182,33 @@ router.post('/import', [auth, admin, upload.single('file')], async (req, res) =>
             const credits = parts[2].trim();
             const schoolCodesStr = parts[3].trim();
             const category = parts[4].trim();
+            const preferredRoomTypesStr = (parts[5] || '').trim(); // Cột thứ 6, tùy chọn
 
             // Basic validation
             if (!subjectCode || !subjectName || !credits || !schoolCodesStr || !category) {
-                errors.push({ row, msg: 'Thiếu thông tin bắt buộc (subjectCode, subjectName, credits, schools, category).' });
+                errors.push({ row: { subjectCode }, msg: 'Thiếu thông tin bắt buộc (subjectCode, subjectName, credits, schools, category).' });
                 continue;
             }
 
             // Validate credits
             const parsedCredits = parseInt(credits, 10);
             if (isNaN(parsedCredits) || parsedCredits <= 0) {
-                errors.push({ row, msg: `Số tín chỉ '${credits}' không hợp lệ.` });
+                errors.push({ row: { subjectCode }, msg: `Số tín chỉ '${credits}' không hợp lệ.` });
                 continue;
             }
 
             // Validate category
             const validCategories = ['required', 'elective', 'general'];
             if (!validCategories.includes(category.toLowerCase())) {
-                errors.push({ row, msg: `Loại môn học '${category}' không hợp lệ. Phải là 'required', 'elective' hoặc 'general'.` });
+                errors.push({ row: { subjectCode }, msg: `Loại môn học '${category}' không hợp lệ. Phải là 'required', 'elective' hoặc 'general'.` });
+                continue;
+            }
+
+            // Validate preferredRoomType if provided
+            const preferredRoomTypes = preferredRoomTypesStr.split(';').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const validRoomTypes = ['theory', 'lab', 'computer_lab', 'lecture_hall'];
+            if (preferredRoomTypes.length > 0 && preferredRoomTypes.some(rt => !validRoomTypes.includes(rt))) {
+                errors.push({ row: { subjectCode }, msg: `Loại phòng ưu tiên '${preferredRoomTypesStr}' chứa giá trị không hợp lệ.` });
                 continue;
             }
 
@@ -206,7 +220,7 @@ router.post('/import', [auth, admin, upload.single('file')], async (req, res) =>
                 if (schoolMap.has(code)) {
                     schoolIds.push(schoolMap.get(code));
                 } else {
-                    errors.push({ row, msg: `Mã trường '${code}' không tồn tại.` });
+                    errors.push({ row: { subjectCode }, msg: `Mã trường '${code}' không tồn tại.` });
                     allSchoolsFound = false;
                     break;
                 }
@@ -216,7 +230,7 @@ router.post('/import', [auth, admin, upload.single('file')], async (req, res) =>
             // Check for duplicate subject code
             let existingSubject = await Subject.findOne({ subjectCode });
             if (existingSubject) {
-                errors.push({ row, msg: `Mã môn học '${subjectCode}' đã tồn tại.` });
+                errors.push({ row: { subjectCode }, msg: `Mã môn học '${subjectCode}' đã tồn tại.` });
                 continue;
             }
 
@@ -226,12 +240,13 @@ router.post('/import', [auth, admin, upload.single('file')], async (req, res) =>
                     subjectName,
                     credits: parsedCredits,
                     schools: schoolIds,
-                    category: category.toLowerCase()
+                    category: category.toLowerCase(),
+                    preferredRoomTypes: preferredRoomTypes.length > 0 ? preferredRoomTypes : ['theory'] // Default to 'theory' if not provided
                 });
                 await newSubject.save();
                 importedSubjects.push(newSubject);
             } catch (dbErr) {
-                errors.push({ row, msg: `Lỗi lưu vào DB: ${dbErr.message}` });
+                errors.push({ row: { subjectCode }, msg: `Lỗi lưu vào DB: ${dbErr.message}` });
             }
         }
 

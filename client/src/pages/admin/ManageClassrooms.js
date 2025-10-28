@@ -79,9 +79,12 @@ const ManageClassrooms = () => {
     const openModal = (classroom = null) => { // Giữ lại dòng này
         setCurrentClassroom(classroom);
         setFormData({
-            building: classroom ? (classroom.roomCode.match(/A(\d+)/) || [])[1] || '' : '', // x
-            roomNumber: classroom ? (classroom.roomCode.match(/-(\d+)/) || [])[1] || '' : '', // y
-            floor: classroom ? (classroom.roomCode.match(/0(\d+)/) || [])[1] || '' : '', // z
+            // Logic phân tích mã phòng mới và chính xác hơn
+            building: classroom ? (classroom.roomCode.match(/^A(\d+)-/)?.[1] || '') : '',
+            // Lấy tất cả các số giữa dấu gạch ngang và số 0 cuối cùng
+            roomNumber: classroom ? (classroom.roomCode.match(/-(\d+)0\d$/)?.[1] || '') : '',
+            // Lấy số cuối cùng sau số 0
+            floor: classroom ? (classroom.roomCode.match(/0(\d)$/)?.[1] || '') : '',
             roomType: classroom ? classroom.roomType : 'theory',
             capacity: classroom ? classroom.capacity : '',
             isActive: classroom ? classroom.isActive : true,
@@ -121,7 +124,7 @@ const ManageClassrooms = () => {
             return;
         }
 
-        const roomCode = `A${building}-${roomNumber}0${floor}`; // Đổi chỗ floor và roomNumber
+        const roomCode = `A${building}-${floor}0${roomNumber}`;
         const toastId = toast.loading(currentClassroom ? 'Đang cập nhật...' : 'Đang thêm mới...');
         try {
             if (currentClassroom) {
