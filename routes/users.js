@@ -6,6 +6,10 @@ const Course = require('../models/Course'); // Import Course model
 const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
+const multer = require('multer');
+const fs = require('fs');
+
+const upload = multer({ dest: 'uploads/' });
 
 // @route   POST api/users
 // @desc    Tạo người dùng mới (chỉ admin)
@@ -69,7 +73,11 @@ router.get('/', [auth, admin], async (req, res) => {
         if (role) {
             query.role = role;
         }
-        const users = await User.find(query).select('-password').populate('school', 'schoolName');
+        const users = await User.find(query)
+            .select('-password')
+            .populate('school', 'schoolName')
+            // Sắp xếp: tài khoản vô hiệu hóa (isActive: false) lên đầu, sau đó sắp xếp theo tên
+            .sort({ isActive: 1, lastName: 1, firstName: 1 });
         res.json({ users });
     } catch (err) {
         console.error(err.message);
@@ -293,5 +301,79 @@ router.delete('/:id', [auth, admin, verifyAdminPassword], async (req, res) => {
     }
 });
 
+// @route   POST /api/users/import-teachers
+// @desc    Import teachers from a CSV file
+// @access  Private (Admin)
+router.post('/import-teachers', [auth, admin, upload.single('file')], async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ msg: 'Vui lòng tải lên một tệp.' });
+    }
+
+    const errors = [];
+    const importedTeachers = [];
+
+    try {
+        const fileContent = fs.readFileSync(req.file.path, 'utf8');
+        const rows = fileContent.split(/\r?\n/).filter(line => line.trim() !== '');
+
+        // Bỏ qua dòng tiêu đề
+        const dataRows = rows.slice(1);
+
+        for (const row of dataRows) {
+            const parts = row.split(',');
+            const emailForRow = parts.length > 1 ? parts[1].trim() : 'không xác định';
+
+            if (parts.length < 3) {
+                errors.push({ row: { email: emailForRow }, msg: 'Dòng không đủ 3 cột (Họ và tên, email, mật khẩu).' });
+                continue;
+            }
+
+            const fullName = parts[0].trim();
+            const email = parts[1].trim();
+            const password = parts[2].trim();
+
+            if (!fullName || !email || !password) {
+                errors.push({ row: { email }, msg: 'Thiếu thông tin bắt buộc.' });
+                continue;
+            }
+
+            // Kiểm tra email đã tồn tại chưa
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                errors.push({ row: { email }, msg: `Email '${email}' đã tồn tại.` });
+                continue;
+            }
+
+            const nameParts = fullName.trim().split(' ');
+            const lastName = nameParts.pop() || '';
+            const firstName = nameParts.join(' ');
+
+            const newTeacher = new User({
+                firstName,
+                lastName,
+                email,
+                password,
+                role: 'teacher'
+            });
+
+            await newTeacher.save();
+            importedTeachers.push(newTeacher);
+        }
+
+        fs.unlinkSync(req.file.path); // Xóa tệp tạm
+
+        res.json({
+            msg: `Đã xử lý ${dataRows.length} dòng. Thêm thành công ${importedTeachers.length} giảng viên.`,
+            processedCount: dataRows.length,
+            importedCount: importedTeachers.length,
+            failedCount: errors.length,
+            errors: errors
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Lỗi Server');
+    }
+});
 
 module.exports = router;
