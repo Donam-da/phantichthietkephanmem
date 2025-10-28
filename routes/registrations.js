@@ -188,14 +188,10 @@ router.post('/', [
       // --- FIX: Add a check to ensure reg.course is not null ---
       // This handles cases where a previously registered course was deleted.
       if (!reg.course) continue;
+      
+      const isSameSubject = reg.course.subject && reg.course.subject._id.toString() === newCourseSubjectId;      
 
-      const isSameSubject = reg.course.subject && reg.course.subject._id.toString() === newCourseSubjectId;
-
-      if (isSameSubject && reg.status === 'approved') {
-        return res.status(400).json({ message: `Bạn đã được duyệt cho lớp ${reg.course.classCode} của môn này. Không thể đăng ký hoặc đổi lớp.` });
-      }
-
-      // If it's a different section of the same subject and is still pending, offer to switch.
+      // If it's a different section of the same subject (and status is pending or approved), offer to switch.
       if (isSameSubject) { // This now covers both previous pending and reverted-approved
         // If it's the exact same course section, it's a straightforward duplicate
         if (reg.course._id.toString() === courseId) {
@@ -326,8 +322,14 @@ router.post('/switch', [
       return res.status(403).json({ message: 'Bạn không có quyền thực hiện hành động này.' });
     }
 
-    if (oldReg.status !== 'pending') {
-      return res.status(400).json({ message: 'Chỉ có thể đổi lớp khi đăng ký cũ đang ở trạng thái "Chờ duyệt".' });
+    // --- NEW: Ensure switching is only possible during the registration period ---
+    const semesterForSwitch = await Semester.findById(oldReg.semester);
+    if (!semesterForSwitch || !semesterForSwitch.isRegistrationOpen()) {
+        return res.status(400).json({ message: 'Đã hết thời gian đăng ký, không thể đổi lớp.' });
+    }
+
+    if (oldReg.status !== 'pending' && oldReg.status !== 'approved') {
+      return res.status(400).json({ message: 'Chỉ có thể đổi lớp khi đăng ký cũ đang ở trạng thái "Chờ duyệt" hoặc "Đã duyệt".' });
     }
 
     // 2. Find and validate the new course
@@ -336,11 +338,12 @@ router.post('/switch', [
       return res.status(400).json({ message: 'Lớp học phần mới không tồn tại hoặc đã đầy.' });
     }
 
-    // --- FIX: Decrement student count for the old course if it was approved ---
-    // This was the source of the negative student count bug.
+    // --- LOGIC: Handle student count and credits when switching from an approved course ---
     if (oldReg.status === 'approved') {
       await Course.findByIdAndUpdate(oldReg.course._id, { $inc: { currentStudents: -1 } });
-      // Credits don't need to be adjusted as they are for the same subject.
+      // Also decrement student's total credits
+      const student = await User.findById(req.user.id);
+      await User.findByIdAndUpdate(student._id, { $inc: { currentCredits: -oldReg.course.subject.credits } });
     }
 
     // 3. Delete the old registration
@@ -355,8 +358,6 @@ router.post('/switch', [
       status: 'pending'
     });
     await newReg.save();
-
-    // Note: Credit and student count updates are handled by post-save/delete hooks in the models.
 
     res.status(201).json({ message: 'Chuyển lớp thành công!', registration: newReg });
   } catch (error) {
@@ -524,6 +525,12 @@ router.delete('/:id', auth, async (req, res) => {
     // Check if student owns this registration
     if (registration.student.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // --- NEW: Ensure dropping is only possible during the registration period ---
+    const semesterForDrop = await Semester.findById(registration.semester);
+    if (!semesterForDrop || !semesterForDrop.isRegistrationOpen()) {
+        return res.status(400).json({ message: 'Đã hết thời gian đăng ký, không thể hủy đăng ký.' });
     }
 
     // Students can only drop courses that are 'pending' or 'approved'.

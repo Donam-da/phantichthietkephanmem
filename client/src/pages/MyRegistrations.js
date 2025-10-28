@@ -130,8 +130,7 @@ const MyRegistrations = () => {
     try {
       await api.delete(`/api/registrations/${selectedRegistration._id}`);
       toast.success('Đã xóa khóa học thành công!');
-      // Update state to remove the dropped registration
-      setRegistrations(prev => prev.filter(reg => reg._id !== selectedRegistration._id));
+      fetchRegistrations(); // Tải lại danh sách đăng ký để cập nhật giao diện
       setShowDetailModal(false); // Close modal after dropping
       setSelectedRegistration(null); // Clear selected registration
     } catch (error) {
@@ -510,7 +509,10 @@ const MyRegistrations = () => {
             </div>
 
             <div className="mt-6 flex justify-end space-x-3">
-              {selectedRegistration.status === 'pending' && (
+              {['pending', 'approved'].includes(selectedRegistration.status) && 
+               selectedRegistration.semester && 
+               new Date() >= new Date(selectedRegistration.semester.registrationStartDate) && 
+               new Date() <= new Date(selectedRegistration.semester.registrationEndDate) && (
                 <button
                   onClick={handleDrop}
                   className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
