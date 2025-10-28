@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs'); // Thêm dòng này để import bcryptjs
 const User = require('../models/User');
 const Course = require('../models/Course'); // Import Course model
 const verifyAdminPassword = require('../middleware/verifyAdminPassword');
+const Semester = require('../models/Semester'); // Import Semester model
 const School = require('../models/School');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
@@ -24,6 +25,8 @@ router.post('/', [
     body('firstName', 'Họ là bắt buộc').not().isEmpty(),
     body('lastName', 'Tên là bắt buộc').not().isEmpty(),
     body('role', 'Vai trò là bắt buộc').isIn(['student', 'teacher', 'admin']),
+    body('year', 'Năm học là bắt buộc và phải là số nguyên dương').if(body('role').equals('student')).isInt({ min: 1 }),
+    body('semester', 'Học kỳ là bắt buộc và phải là số nguyên dương').if(body('role').equals('student')).isInt({ min: 1 }),
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -31,7 +34,7 @@ router.post('/', [
     }
 
     const { email, password, firstName, lastName, role, studentId, school } = req.body;
-    const { teachingSchools } = req.body; // NEW: Get teachingSchools from body
+    const { teachingSchools, year, semester } = req.body; // Thêm year, semester
     try {
         let user = await User.findOne({ email });
         if (user) {
@@ -45,6 +48,13 @@ router.post('/', [
             }
         }
 
+        // Lấy maxCredits từ học kỳ được chọn khi tạo sinh viên
+        let maxCreditsForStudent = 24; // Giá trị mặc định
+        if (role === 'student' && semester) {
+            const selectedSemester = await Semester.findOne({ semesterNumber: semester, academicYear: new Date().getFullYear() }); // Giả sử tìm theo năm hiện tại
+            if (selectedSemester) maxCreditsForStudent = selectedSemester.maxCreditsPerStudent;
+        }
+
         user = new User({
             email,
             password,
@@ -53,6 +63,9 @@ router.post('/', [
             role,
             studentId: role === 'student' ? studentId : undefined,
             school: role === 'student' ? school : undefined,
+            year: role === 'student' ? year : undefined, // Thêm year cho sinh viên
+            semester: role === 'student' ? semester : undefined, // Thêm semester cho sinh viên
+            maxCredits: role === 'student' ? maxCreditsForStudent : undefined, // Gán maxCredits
             teachingSchools: role === 'teacher' ? teachingSchools : undefined, // NEW: Assign teachingSchools for teachers
         });
 
@@ -182,7 +195,9 @@ router.put('/:id', [
             return res.status(404).json({ msg: 'Không tìm thấy người dùng' });
         }
         
-        const { firstName, lastName, email, isActive, teachingSchools } = req.body; // NEW: Get teachingSchools
+        const { firstName, lastName, email, isActive, teachingSchools, year, semester } = req.body; // Thêm year, semester
+
+        // Validation cho year và semester nếu có
         // --- LOGIC MỚI: Xử lý khi vô hiệu hóa một giảng viên ---
         // Nếu người dùng bị vô hiệu hóa (isActive: false) và là một giảng viên
         if (isActive === false && userToUpdate.role === 'teacher') {
@@ -221,6 +236,14 @@ router.put('/:id', [
         }
         if (typeof isActive !== 'undefined') userToUpdate.isActive = isActive;
         if (userToUpdate.role === 'teacher' && teachingSchools) userToUpdate.teachingSchools = teachingSchools; // NEW: Update teachingSchools
+        
+        // Cập nhật year và semester cho sinh viên
+        if (userToUpdate.role === 'student') {
+            if (year !== undefined && year !== null && !isNaN(parseInt(year))) userToUpdate.year = parseInt(year);
+            if (semester !== undefined && semester !== null && !isNaN(parseInt(semester))) userToUpdate.semester = parseInt(semester);
+        }
+
+
 
         await userToUpdate.save();
 

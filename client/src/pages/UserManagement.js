@@ -13,12 +13,14 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [schools, setSchools] = useState([]);
-  const [createFormData, setCreateFormData] = useState({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '' });
+  const [createFormData, setCreateFormData] = useState({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '', year: '', semester: '' });
+  const [activeSemesters, setActiveSemesters] = useState([]);
 
   useEffect(() => {
     fetchUsers();
     fetchSchools();
-  }, []);
+    fetchActiveSemesters();
+  }, []); // Thêm fetchActiveSemesters vào useEffect
 
   const fetchUsers = async () => {
     try {
@@ -49,6 +51,15 @@ const UserManagement = () => {
       toast.error('Không thể tải danh sách trường.');
     }
   };
+
+  const fetchActiveSemesters = async () => {
+    try {
+      const res = await api.get('/api/semesters?isActive=true');
+      setActiveSemesters(res.data);
+    } catch (error) {
+      toast.error('Không thể tải danh sách học kỳ đang hoạt động.');
+    }
+  };
   const handleToggleActive = async (userId, isActive) => {
     try {
       await api.put(`/api/users/${userId}`, { isActive: !isActive });
@@ -63,7 +74,7 @@ const UserManagement = () => {
     try {
       setDetailLoading(true);
       setShowDetailModal(true);
-      const res = await api.get(`/api/users/students/${userId}`);
+      const res = await api.get(`/api/users/${userId}`);
       setSelectedUser(res.data);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Không thể tải chi tiết sinh viên');
@@ -82,14 +93,41 @@ const UserManagement = () => {
     setCreateFormData({ ...createFormData, [e.target.name]: e.target.value });
   };
 
+  // Hàm mới để xử lý khi chọn một học kỳ
+  const handleSemesterSelectionChange = (e) => {
+    const selectedSemesterId = e.target.value;
+    const selectedSemester = activeSemesters.find(s => s._id === selectedSemesterId);
+    if (selectedSemester) {
+      setCreateFormData(prev => ({
+        ...prev,
+        year: selectedSemester.semesterNumber, // Cập nhật năm học
+        semester: selectedSemester.semesterNumber, // Cập nhật số học kỳ
+      }));
+    }
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     const toastId = toast.loading('Đang tạo người dùng...');
     try {
-      await api.post('/api/users', createFormData);
+      // Tách fullName thành firstName và lastName trước khi gửi
+      const { fullName, ...restOfData } = createFormData;
+      const nameParts = fullName.trim().split(' ');
+      const lastName = nameParts.pop() || '';
+      const firstName = nameParts.join(' ');
+
+      if (!firstName || !lastName) {
+        toast.error('Vui lòng nhập họ và tên đầy đủ.', { id: toastId });
+        return;
+      }
+
+      const submissionData = { ...restOfData, firstName, lastName };
+
+      await api.post('/api/users', submissionData);
+
       toast.success('Tạo người dùng thành công!', { id: toastId });
       setShowCreateModal(false);
-      setCreateFormData({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '' });
+      setCreateFormData({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '', year: '', semester: '' });
       fetchUsers();
     } catch (error) {
       toast.error(error.response?.data?.msg || 'Lỗi khi tạo người dùng.', { id: toastId });
@@ -237,6 +275,22 @@ const UserManagement = () => {
                       {schools.map(s => <option key={s._id} value={s._id}>{s.schoolName}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className="form-label">Học kỳ nhập học</label>
+                    <select
+                      name="semesterSelection" // Tên mới cho dropdown
+                      onChange={handleSemesterSelectionChange}
+                      className="input-field"
+                      required
+                    >
+                      <option value="">Chọn học kỳ</option>
+                      {activeSemesters.map(s => (
+                        <option key={s._id} value={s._id}>
+                          {s.name} ({s.academicYear})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               )}
               <div className="flex justify-end space-x-2 pt-4">
@@ -303,7 +357,10 @@ const UserManagement = () => {
                   {(selectedUser.currentCredits !== undefined || selectedUser.maxCredits !== undefined) && (
                     <div className="grid grid-cols-3 gap-2">
                       <span className="text-gray-500">Tín chỉ</span>
-                      <span className="col-span-2 text-gray-900">{selectedUser.currentCredits || 0}/{selectedUser.maxCredits || 0}</span>
+                      <span className="col-span-2 text-gray-900">
+                        {selectedUser.currentCredits || 0}/
+                        {activeSemesters.find(s => s.isCurrent)?.maxCreditsPerStudent || selectedUser.maxCredits || 24}
+                      </span>
                     </div>
                   )}
                   {selectedUser.phone && (

@@ -359,7 +359,7 @@ const Profile = () => {
                         <div>
                           <label className="form-label">Năm học</label>
                           <select {...register('year', { valueAsNumber: true })} className="input-field">
-                            <option value="">Chọn năm học</option>
+                            <option value="" disabled>Chọn năm học</option>
                             {[1, 2, 3, 4, 5].map(y => (
                               <option key={y} value={y}>Năm {y}</option>
                             ))}
@@ -368,7 +368,7 @@ const Profile = () => {
                         <div>
                           <label className="form-label">Học kỳ</label>
                           <select {...register('semester', { valueAsNumber: true })} className="input-field">
-                            <option value="">Chọn học kỳ</option>
+                            <option value="" disabled>Chọn học kỳ</option>
                             {activeSemesters.map(s => (
                               <option key={s._id} value={s.semesterNumber}>{s.name}</option>
                             ))}
@@ -637,7 +637,9 @@ const Profile = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Tín chỉ hiện tại:</span>
-                  <span className="font-medium text-gray-900">{user.currentCredits || 0}/{user.maxCredits || 24}</span>
+                  <span className="font-medium text-gray-900">
+                    {user.currentCredits || 0}/{activeSemesters.find(s => s.isCurrent)?.maxCreditsPerStudent || user.maxCredits || 24}
+                  </span>
                 </div>
               </div>
             </div>

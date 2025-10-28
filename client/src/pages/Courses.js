@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Filter,
@@ -13,12 +13,14 @@ import toast from 'react-hot-toast';
 const Courses = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [myRegistrations, setMyRegistrations] = useState([]);
   const [semesters, setSemesters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     semester: '',
+    subject: '',
     onlyMySchoolCourses: true,
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -32,34 +34,42 @@ const Courses = () => {
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
   const [isThisCourseRegistered, setIsThisCourseRegistered] = useState(false);
 
+  const fetchMyRegistrations = useCallback(async () => {
+    if (user?.role === 'student') {
+      try {
+        const regsRes = await api.get('/api/registrations');
+        setMyRegistrations(regsRes.data.registrations);
+      } catch (error) {
+        // Don't show a toast here to avoid bothering the user on re-fetches
+        console.error("Failed to re-fetch registrations:", error);
+      }
+    }
+  }, [user?.role]);
+
   const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
   const periodNames = { 1: 'Ca 1 (6h45-9h25)', 2: 'Ca 2 (9h40-12h10)', 3: 'Ca 3 (13h-15h30)', 4: 'Ca 4 (15h45-18h25)' };
 
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const apiCalls = [api.get('/api/semesters?isActive=true')];
-        if (user?.role === 'student') {
-          apiCalls.push(api.get('/api/registrations'));
-        }
-
-        const [semestersRes, regsRes] = await Promise.all(apiCalls);
-
+        const [semestersRes, subjectsRes] = await Promise.all([
+          api.get('/api/semesters?isActive=true'),
+          api.get('/api/subjects')
+        ]);
         if (semestersRes.data) {
           setSemesters(semestersRes.data);
           if (semestersRes.data.length > 0) {
             setFilters(prev => ({ ...prev, semester: semestersRes.data[0]._id }));
           }
         }
-        if (regsRes && regsRes.data) {
-          setMyRegistrations(regsRes.data.registrations);
-        }
+        setSubjects(subjectsRes.data);
+        fetchMyRegistrations(); // Call the registration fetch separately
       } catch (error) {
         toast.error('Không thể tải danh sách học kỳ.');
       }
     };
     fetchInitialData();
-  }, [user?.role]); // Keep user?.role as the primary dependency
+  }, [fetchMyRegistrations]);
 
   const getDatesForDayOfWeek = useCallback((semesterId, dayOfWeek) => {
     if (!semesterId || !dayOfWeek) return [];
@@ -99,11 +109,15 @@ const Courses = () => {
     if (!filters.semester) return;
     try {
       setLoading(true);
-      const params = new URLSearchParams();
+      const params = {
+        semester: filters.semester,
+        subject: filters.subject || undefined, // Gửi subject nếu có
+        school: filters.onlyMySchoolCourses ? user?.school?._id : undefined, // Gửi school nếu được chọn
+        // Thêm searchTerm vào params để lọc ở backend nếu muốn
+        // searchTerm: searchTerm || undefined,
+      };
 
-      if (filters.semester) params.append('semester', filters.semester);
-
-      const coursesRes = await api.get(`/api/courses?${params.toString()}`);
+      const coursesRes = await api.get(`/api/courses`, { params: Object.fromEntries(Object.entries(params).filter(([_, v]) => v != null)) });
       setCourses(coursesRes.data.courses);
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -111,7 +125,7 @@ const Courses = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters.semester]);
+  }, [filters, user?.school?._id]); // Bỏ searchTerm, chỉ phụ thuộc vào filters và user school
 
   useEffect(() => {
     fetchCourses();
@@ -167,7 +181,8 @@ const Courses = () => {
 
       toast.success('Đăng ký khóa học thành công!');
       setShowScheduleDetailModal(false);
-      fetchCourses(); // Refetch to update UI
+      fetchCourses(); // Tải lại danh sách lớp học
+      fetchMyRegistrations(); // Tải lại danh sách đăng ký của sinh viên
     } catch (error) {
       console.error('Error registering for course:', error);
       if (error.response && error.response.status === 409 && error.response.data.conflictType === 'SUBJECT_DUPLICATE' && error.response.data.existingRegistrationId) {
@@ -190,7 +205,8 @@ const Courses = () => {
       });
       toast.success('Chuyển lớp thành công!', { id: toastId });
       setShowScheduleDetailModal(false);
-      fetchCourses(); // Refetch to update UI
+      fetchCourses(); // Tải lại danh sách lớp học
+      fetchMyRegistrations(); // Tải lại danh sách đăng ký của sinh viên
       // You might want to navigate to my-registrations or refresh the current view
     } catch (error) {
       console.error('Error switching course:', error);
@@ -260,13 +276,8 @@ const Courses = () => {
   };
 
   const filteredCourses = courses.filter(course => {
-    // Filter by school
-    if (filters.onlyMySchoolCourses && user?.role === 'student' && user.school?._id) {
-      if (!course.subject?.schools?.includes(user.school._id)) {
-        return false;
-      }
-    }
-
+    // Việc lọc theo school và subject đã được thực hiện ở backend.
+    // Giờ đây chúng ta chỉ cần lọc theo searchTerm ở client.
     const term = removeAccents(searchTerm.toLowerCase());
     const subjectName = removeAccents(course.subject?.subjectName?.toLowerCase() || '');
     const subjectCode = removeAccents(course.subject?.subjectCode?.toLowerCase() || '');
@@ -275,6 +286,16 @@ const Courses = () => {
 
     return subjectName.includes(term) || subjectCode.includes(term) || teacherName.includes(term) || classCode.includes(term);
   });
+
+  const filteredSubjectsForDropdown = useMemo(() => {
+    if (filters.onlyMySchoolCourses && user?.role === 'student' && user.school?._id) {
+      return subjects.filter(sub => 
+        sub.schools && sub.schools.some(schoolId => schoolId === user.school._id)
+      );
+    }
+    return subjects;
+  }, [subjects, filters.onlyMySchoolCourses, user]);
+
 
   if (loading) {
     return (
@@ -333,6 +354,17 @@ const Courses = () => {
                 </select>
               </div>
 
+              <div>
+                <label className="form-label">Môn học</label>
+                <select
+                  value={filters.subject}
+                  onChange={(e) => setFilters({ ...filters, subject: e.target.value })}
+                  className="input-field"
+                >
+                  <option value="">Tất cả môn học</option>
+                  {filteredSubjectsForDropdown.map((sub) => <option key={sub._id} value={sub._id}>{sub.subjectName} ({sub.subjectCode})</option>)}
+                </select>
+              </div>
               <div>
                 <label className="form-label">Tùy chọn</label>
                 <div className="mt-2 flex items-center">

@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
             isActive,
             teacher,
             subject,
+            school, // Thêm bộ lọc school
             page = 1,
             limit = 20
         } = req.query;
@@ -28,6 +29,16 @@ router.get('/', async (req, res) => {
         if (isActive !== undefined) filter.isActive = isActive === 'true';
         if (teacher) filter.teacher = teacher;
         if (subject) filter.subject = subject;
+
+        // Nếu có bộ lọc `school`, chúng ta cần tìm các môn học thuộc trường đó trước
+        if (school) {
+            const Subject = require('../models/Subject');
+            // Tìm tất cả các subjectId thuộc về trường được chỉ định
+            const subjectsInSchool = await Subject.find({ schools: school }).select('_id');
+            const subjectIds = subjectsInSchool.map(s => s._id);
+            // Thêm điều kiện lọc vào `filter`
+            filter.subject = { $in: subjectIds };
+        }
 
         const skip = (page - 1) * limit;
 
