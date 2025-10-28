@@ -38,7 +38,13 @@ const ManageSchools = () => {
     }, [fetchSchools]);
 
     const handleInputChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        // Tự động chuyển mã trường thành chữ hoa
+        if (name === 'schoolCode') {
+            setFormData({ ...formData, [name]: value.toUpperCase() });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
     };
 
     const openModal = (school = null) => {
@@ -152,8 +158,8 @@ const ManageSchools = () => {
                                     id="schoolCode"
                                     value={formData.schoolCode}
                                     onChange={handleInputChange}
-                                    className="mt-1 input-field"
-                                    disabled={!!currentSchool} // Không cho sửa mã trường
+                                    className="mt-1 input-field uppercase"
+                                    placeholder="VD: CNTT"
                                     required
                                 />
                             </div>

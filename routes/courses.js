@@ -148,13 +148,21 @@ router.put('/:id', [auth, admin], async (req, res) => {
             return res.status(404).json({ msg: 'Không tìm thấy lớp học phần' });
         }
 
-        const { maxStudents, teacher, schedule, notes } = req.body;
-        let { isActive } = req.body; // Giữ lại dòng này
+        const { maxStudents, teacher, schedule, notes, isActive } = req.body;
 
-        // If a teacher is removed, the course must be deactivated.
-        // If a teacher is present, isActive can be what the user sent.
-        const finalIsActive = !!teacher && isActive; // Course is active ONLY IF a teacher is present AND isActive is true.
-        const finalNotes = !teacher ? "Lớp tạm khóa do thiếu giảng viên." : notes;
+        // Logic mới để xác định trạng thái `isActive` và `notes`
+        let finalIsActive;
+        let finalNotes = notes || course.notes; // Giữ lại notes cũ nếu không có notes mới
+
+        if (teacher) {
+            // Nếu có giảng viên, trạng thái `isActive` sẽ do admin quyết định (gửi từ frontend)
+            finalIsActive = isActive;
+            finalNotes = isActive ? "" : (notes || "Lớp bị khóa bởi quản trị viên.");
+        } else {
+            // Nếu không có giảng viên, lớp bắt buộc phải bị khóa
+            finalIsActive = false;
+            finalNotes = "Lớp tạm khóa do thiếu giảng viên.";
+        }
 
         const updatedCourse = await Course.findByIdAndUpdate(
             req.params.id,

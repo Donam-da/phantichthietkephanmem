@@ -24,8 +24,11 @@ const SubjectSchema = new mongoose.Schema({
         ref: 'School',
         required: true,
     }],
-}, {
-    timestamps: true
-});
+    category: {
+        type: String,
+        enum: ['required', 'elective', 'general'],
+        required: true
+    }
+}, { timestamps: true });
 
 module.exports = mongoose.model('Subject', SubjectSchema);

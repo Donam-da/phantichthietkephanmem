@@ -1,0 +1,21 @@
+subjectCode,subjectName,credits,schools,category
+IT101,Nhập môn Tin học,3,CNTT,required
+IT102,Lập trình C++,4,CNTT,required
+IT205,Cơ sở dữ liệu,3,CNTT;KT,required
+IT310,Mạng máy tính nâng cao,3,CNTT,elective
+ECO101,Kinh tế vi mô,3,KT;KTE,required
+ECO102,Kinh tế vĩ mô,3,KT;KTE,required
+ACC201,Nguyên lý kế toán,3,KT,required
+MKT301,Marketing căn bản,3,KTE,elective
+FIN305,Tài chính doanh nghiệp,3,KT;KTE,elective
+YD101,Giải phẫu học,4,YD,required
+YD202,Sinh lý học,4,YD,required
+YD305,Dược lý học,3,YD,elective
+NN101,Ngữ âm học,2,NN-KH,required
+NN205,Văn hóa Anh-Mỹ,2,NN-KH,elective
+MA101,Giải tích 1,4,CNTT;KT;YD,general
+MA202,Xác suất thống kê,3,CNTT;KT;KTE,general
+PH101,Vật lý đại cương,3,CNTT;YD,general
+PE101,Giáo dục thể chất 1,1,CNTT;KT;KTE;NN-KH;YD,required
+LAW101,Pháp luật đại cương,2,CNTT;KT;KTE;NN-KH;YD,general
+ENG101,Tiếng Anh cơ bản 1,3,CNTT;KT;KTE;NN-KH;YD,required

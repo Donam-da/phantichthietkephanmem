@@ -32,6 +32,7 @@ const CourseManagement = () => {
     semester: '',
     teacher: '',
     schedule: [{ dayOfWeek: 2, period: 1, classroom: '' }],
+    isActive: true, // Thêm trường isActive
   });
 
   const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
@@ -263,7 +264,12 @@ const CourseManagement = () => {
     try {
       if (editingCourse) {
         // We only submit fields that can be updated
-        await api.put(`/api/courses/${editingCourse._id}`, { maxStudents: formData.maxStudents, teacher: formData.teacher, schedule: formData.schedule, isActive: formData.isActive });
+        await api.put(`/api/courses/${editingCourse._id}`, { 
+          maxStudents: formData.maxStudents, 
+          teacher: formData.teacher, 
+          schedule: formData.schedule, 
+          isActive: formData.isActive 
+        });
         toast.success('Cập nhật lớp học phần thành công');
       } else {
         await api.post('/api/courses', submissionData);
@@ -289,6 +295,7 @@ const CourseManagement = () => {
         period: s.period,
         classroom: s.classroom?._id || s.classroom,
       })),
+      isActive: course.teacher ? course.isActive : false, // Lớp không có GV thì không thể active
     });
     setShowForm(true);
   };
@@ -581,6 +588,20 @@ const CourseManagement = () => {
                     <option value="">Tạm thời chưa có giảng viên</option>
                     {teachers.map(t => <option key={t._id} value={t._id}>{t.firstName} {t.lastName}</option>)}
                   </select>
+                  {editingCourse && (
+                    <div className="mt-2 flex items-center">
+                      <input
+                        id="isActive"
+                        name="isActive"
+                        type="checkbox"
+                        checked={formData.isActive}
+                        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                        disabled={!formData.teacher}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:bg-gray-200"
+                      />
+                      <label htmlFor="isActive" className={`ml-2 block text-sm ${!formData.teacher ? 'text-gray-400' : 'text-gray-900'}`}>Lớp học đang hoạt động { !formData.teacher && '(cần có giảng viên)'}</label>
+                    </div>
+                  )}
                 </div>
 
                 {/* Schedule */}

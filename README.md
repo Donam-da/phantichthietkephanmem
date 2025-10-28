@@ -69,6 +69,10 @@ npm run seed
 #hoặc 
 node scripts/clearAndSeedAdmin.js
 
+#tải xuống và cài đặt hai gói csv-parser và multer(import từ tệp csv hoặc notepad)
+
+npm install csv-parser multer
+
 # Cài đặt dependencies cho Backend
 npm install
 

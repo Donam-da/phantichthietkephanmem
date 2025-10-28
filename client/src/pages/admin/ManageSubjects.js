@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit, Trash2, BookOpen } from 'lucide-react';
+import { Trash2, BookOpen, Search, Upload, Edit } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import ConfirmPasswordModal from '../../components/ConfirmPasswordModal';
@@ -15,11 +15,22 @@ const ManageSubjects = () => {
         subjectName: '',
         credits: '',
         schools: [],
+        category: 'required',
     });
-    // State cho modal xác nhận mật khẩu
+    // State cho bộ lọc và tìm kiếm
+    const [filters, setFilters] = useState({
+        school: '',
+        credits: '',
+        searchTerm: '',
+    });
+    // State cho modal xác nhận mật khẩu và import
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState(null);
     const [isConfirming, setIsConfirming] = useState(false);
+    // State cho chức năng import
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importResults, setImportResults] = useState(null); // Để hiển thị kết quả sau khi import
 
     const getAuthHeaders = () => ({ headers: { 'x-auth-token': localStorage.getItem('token') } });
 
@@ -72,6 +83,7 @@ const ManageSubjects = () => {
             subjectName: subject ? subject.subjectName : '',
             credits: subject ? subject.credits : '',
             schools: subject ? subject.schools.map(s => s._id) : [],
+            category: subject ? subject.category : 'required',
         });
         setIsModalOpen(true);
     };
@@ -98,6 +110,34 @@ const ManageSubjects = () => {
         }
     };
 
+    const handleFilterChange = (e) => {
+        const { name, value } = e.target;
+        setFilters(prev => ({ ...prev, [name]: value }));
+    };
+
+    // Hàm chuẩn hóa chuỗi để tìm kiếm không phân biệt dấu, chữ hoa/thường
+    const normalizeText = (str) => {
+        if (!str) return '';
+        return str
+            .toLowerCase() // Chuyển về chữ thường
+            .normalize("NFD") // Tách dấu ra khỏi chữ
+            .replace(/[\u0300-\u036f]/g, "") // Bỏ các dấu thanh
+            .replace(/đ/g, "d"); // Chuyển 'đ' thành 'd'
+    };
+
+    const filteredSubjects = subjects.filter(subject => {
+        const { school, credits, searchTerm } = filters;
+        const normalizedSearchTerm = normalizeText(searchTerm);
+
+        const schoolMatch = !school || subject.schools.some(s => s._id === school);
+        const creditsMatch = !credits || subject.credits.toString() === credits;
+        const searchMatch = !normalizedSearchTerm ||
+            normalizeText(subject.subjectName).includes(normalizedSearchTerm) ||
+            normalizeText(subject.subjectCode).includes(normalizedSearchTerm);
+
+        return schoolMatch && creditsMatch && searchMatch;
+    });
+
     // --- LOGIC MỚI: Xử lý chọn và xóa hàng loạt ---
     const [selectedSubjects, setSelectedSubjects] = useState([]);
 
@@ -106,7 +146,7 @@ const ManageSubjects = () => {
     };
 
     const handleSelectAll = (e) => {
-        setSelectedSubjects(e.target.checked ? subjects.map(s => s._id) : []);
+        setSelectedSubjects(e.target.checked ? filteredSubjects.map(s => s._id) : []);
     };
 
     const handleDeleteSelected = () => {
@@ -128,14 +168,63 @@ const ManageSubjects = () => {
             setSelectedSubjects([]);
             fetchData();
         } catch (error) {
-            toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+            const errorMsg = error.response?.data?.msg || 'Xóa thất bại.';
+            toast.error(errorMsg, { id: toastId });
+            // Tự động reload lại trang nếu lỗi do sai mật khẩu
+            if (errorMsg.includes('Mật khẩu không chính xác')) {
+                setIsConfirmModalOpen(false);
+                setTimeout(() => window.location.reload(), 1500);
+            }
         } finally {
             setIsConfirming(false);
             setIsConfirmModalOpen(false);
         }
     };
 
-    const isAllSelected = subjects.length > 0 && selectedSubjects.length === subjects.length;
+    // --- LOGIC CHO CHỨC NĂNG IMPORT ---
+    const openImportModal = () => {
+        setIsImportModalOpen(true);
+        setImportFile(null);
+        setImportResults(null);
+    };
+
+    const closeImportModal = () => {
+        setIsImportModalOpen(false);
+        setImportFile(null);
+        setImportResults(null);
+    };
+
+    const handleImportFileChange = (e) => {
+        setImportFile(e.target.files[0]);
+    };
+
+    const handleImportSubmit = async (e) => {
+        e.preventDefault();
+        if (!importFile) {
+            toast.error('Vui lòng chọn một tệp để nhập.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', importFile);
+
+        const toastId = toast.loading('Đang nhập môn học...');
+        try {
+            const res = await axios.post('/api/subjects/import', formData, {
+                headers: {
+                    ...getAuthHeaders().headers,
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            toast.success(res.data.msg, { id: toastId });
+            setImportResults(res.data);
+            fetchData(); // Refresh subject list
+        } catch (error) {
+            toast.error(error.response?.data?.msg || 'Lỗi khi nhập môn học.', { id: toastId });
+            setImportResults(error.response?.data || { failedCount: 1, errors: [{ msg: error.response?.data?.msg || 'Lỗi không xác định.' }] });
+        }
+    };
+    const isAllSelected = filteredSubjects.length > 0 && selectedSubjects.length === filteredSubjects.length;
     // --- KẾT THÚC LOGIC MỚI ---
 
     const handleDelete = (id) => {
@@ -152,12 +241,21 @@ const ManageSubjects = () => {
             closeModal();
             fetchData();
         } catch (error) {
-            toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+            const errorMsg = error.response?.data?.msg || 'Xóa thất bại.';
+            toast.error(errorMsg, { id: toastId });
+            // Tự động reload lại trang nếu lỗi do sai mật khẩu
+            if (errorMsg.includes('Mật khẩu không chính xác')) {
+                setIsConfirmModalOpen(false);
+                setTimeout(() => window.location.reload(), 1500);
+            }
         } finally {
             setIsConfirming(false);
             setIsConfirmModalOpen(false);
         }
     };
+
+    // Lấy danh sách số tín chỉ duy nhất từ các môn học đã có để hiển thị trong bộ lọc
+    const uniqueCredits = [...new Set(subjects.map(s => s.credits))].sort((a, b) => a - b);
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
@@ -166,6 +264,42 @@ const ManageSubjects = () => {
                     <h1 className="text-3xl font-bold text-gray-900">Quản lý Môn học</h1>
                     <p className="mt-1 text-sm text-gray-600">Thêm, sửa, và quản lý các môn học trong chương trình đào tạo.</p>
                 </div>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label htmlFor="searchTerm" className="form-label">Tìm kiếm</label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input type="text" id="searchTerm" name="searchTerm" placeholder="Tên hoặc mã môn..." value={filters.searchTerm} onChange={handleFilterChange} className="input-field pl-10" />
+                        </div>
+                    </div>
+                    <div>
+                        <label htmlFor="school-filter" className="form-label">Lọc theo trường</label>
+                        <select id="school-filter" name="school" value={filters.school} onChange={handleFilterChange} className="input-field">
+                            <option value="">Tất cả các trường</option>
+                            {allSchools.map(school => (
+                                <option key={school._id} value={school._id}>{school.schoolName}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="credits-filter" className="form-label">Lọc theo tín chỉ</label>
+                        <select id="credits-filter" name="credits" value={filters.credits} onChange={handleFilterChange} className="input-field">
+                            <option value="">Tất cả tín chỉ</option>
+                            {uniqueCredits.map(c => (
+                                <option key={c} value={c}>{c} tín chỉ</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mb-4">
                 <div className="flex items-center gap-2 mt-4 sm:mt-0">
                     {selectedSubjects.length > 0 && (
                         <button
@@ -176,6 +310,13 @@ const ManageSubjects = () => {
                             Xóa ({selectedSubjects.length})
                         </button>
                     )}
+                    <button
+                        onClick={openImportModal}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all"
+                    >
+                        <Upload className="h-5 w-5" />
+                        Nhập từ Excel/CSV
+                    </button>
                     <button 
                         onClick={() => openModal()} 
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
@@ -207,10 +348,11 @@ const ManageSubjects = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Tên Môn học</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Số TC</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Các trường</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-red-800 uppercase tracking-wider">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {subjects.map((subject) => (
+                            {filteredSubjects.map((subject) => (
                                 <tr key={subject._id} onDoubleClick={() => openModal(subject)} className={`hover:bg-gray-50 cursor-pointer ${selectedSubjects.includes(subject._id) ? 'bg-blue-50' : ''}`}>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <input type="checkbox" className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked={selectedSubjects.includes(subject._id)} onChange={() => handleSelectSubject(subject._id)} onClick={(e) => e.stopPropagation()} />
@@ -220,6 +362,11 @@ const ManageSubjects = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">{subject.credits}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                         {subject.schools.map(s => s.schoolCode).join(', ')}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={(e) => { e.stopPropagation(); openModal(subject); }} className="text-indigo-600 hover:text-indigo-900">
+                                            <Edit className="h-5 w-5" />
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -248,6 +395,20 @@ const ManageSubjects = () => {
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700">Tên Môn học</label>
                                 <input type="text" name="subjectName" value={formData.subjectName} onChange={handleInputChange} className="mt-1 input-field" required />
+                            </div>
+                            <div className="mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Loại môn</label>
+                                    <select
+                                        name="category"
+                                        value={formData.category}
+                                        onChange={handleInputChange}
+                                        className="mt-1 input-field w-full" required>
+                                        <option value="required">Bắt buộc</option>
+                                        <option value="elective">Tự chọn</option>
+                                        <option value="general">Đại cương</option>
+                                    </select>
+                                </div>
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700">Áp dụng cho các trường</label>
@@ -288,6 +449,59 @@ const ManageSubjects = () => {
                 </div>
             )}
 
+            {isImportModalOpen && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div className="relative top-20 mx-auto p-6 border w-full max-w-md shadow-lg rounded-xl bg-white">
+                        <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+                            Nhập Môn học từ tệp
+                        </h3>
+                        <form onSubmit={handleImportSubmit}>
+                            <div className="mb-4">
+                                <label htmlFor="importFile" className="block text-sm font-medium text-gray-700">Chọn tệp Excel/CSV</label>
+                                <input
+                                    type="file"
+                                    id="importFile"
+                                    name="importFile"
+                                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                                    onChange={handleImportFileChange}
+                                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    required
+                                />
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Các cột: `subjectCode`, `subjectName`, `credits`, `schools`, `category`. Các mã trường trong cột `schools` phải cách nhau bởi dấu chấm phẩy (;).
+                                </p>
+                            </div>
+
+                            {importResults && (
+                                <div className="mt-4 p-3 bg-gray-50 rounded-md border">
+                                    <p className="text-sm font-medium text-gray-800">Kết quả nhập:</p>
+                                    <p className="text-sm text-gray-700">Tổng số dòng đã xử lý: {importResults.processedCount || (importResults.importedCount + importResults.failedCount)}</p>
+                                    <p className="text-sm text-green-600">Thêm thành công: {importResults.importedCount}</p>
+                                    {importResults.failedCount > 0 && (
+                                        <div className="text-sm text-red-600">
+                                            Thất bại: {importResults.failedCount}
+                                            <ul className="list-disc list-inside mt-2 text-xs">
+                                                {importResults.errors.map((err, index) => (
+                                                    <li key={index}>Mã môn '{err.row.subjectCode || 'không xác định'}': {err.msg}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex justify-end space-x-3 mt-6">
+                                <button type="button" onClick={closeImportModal} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all">
+                                    Đóng
+                                </button>
+                                <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">
+                                    Tải lên và Nhập
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
             <ConfirmPasswordModal
                 isOpen={isConfirmModalOpen}
                 onClose={() => setIsConfirmModalOpen(false)}
