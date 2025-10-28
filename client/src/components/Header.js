@@ -41,8 +41,8 @@ const Header = () => {
                 <div className="flex justify-end items-center h-16">
                     <div className="flex items-center space-x-4">
                         {isAdmin && (
-                            <Link to="/admin/requests" className="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
-                                <Bell className="h-6 w-6" />
+                            <Link to="/admin/requests" className="relative p-2 rounded-full text-yellow-500 hover:bg-yellow-100 hover:text-yellow-600 transition-colors">
+                                <Bell className="h-6 w-6" fill="currentColor" />
                                 {pendingRequests > 0 && (
                                     <span className="absolute top-1 right-1 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>
                                 )}

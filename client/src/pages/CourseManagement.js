@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { Plus, Search, Filter } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -395,37 +396,51 @@ const CourseManagement = () => {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+    <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+        <div>
+        <h1 className="text-3xl font-bold text-gray-900">
           {isTeacher ? 'Các lớp học phần của tôi' : 'Quản lý Lớp học phần'}
         </h1>
+        <p className="mt-1 text-sm text-gray-600">
+          {isTeacher ? 'Xem và quản lý các lớp học phần bạn được phân công.' : 'Tạo, chỉnh sửa và quản lý tất cả các lớp học phần trong hệ thống.'}
+        </p>
+        </div>
         {!isTeacher && (
-          <button onClick={() => setShowForm(true)} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-            Thêm lớp học phần
+          <button 
+            onClick={() => setShowForm(true)} 
+            className="mt-4 sm:mt-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Thêm lớp mới</span>
           </button>
         )}
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="form-label">Học kỳ</label>
-            <select name="semester" value={filters.semester} onChange={handleFilterChange} className="input-field">
+            <label htmlFor="semester-filter" className="block text-sm font-medium text-gray-700 mb-1">Học kỳ</label>
+            <select id="semester-filter" name="semester" value={filters.semester} onChange={handleFilterChange} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
               {semesters.map(sem => <option key={sem._id} value={sem._id}>{sem.name} ({sem.academicYear})</option>)}
             </select>
           </div>
           <div>
-            <label className="form-label">Môn học</label>
-            <select name="subject" value={filters.subject} onChange={handleFilterChange} className="input-field">
+            <label htmlFor="subject-filter" className="block text-sm font-medium text-gray-700 mb-1">Môn học</label>
+            <select id="subject-filter" name="subject" value={filters.subject} onChange={handleFilterChange} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
               <option value="">Tất cả môn học</option>
               {subjects.map(sub => <option key={sub._id} value={sub._id}>{sub.subjectName}</option>)}
             </select>
           </div>
           <div>
-            <label className="form-label">Tìm kiếm</label>
-            <input type="text" name="searchTerm" placeholder="Tên môn, mã môn, mã lớp..." value={filters.searchTerm} onChange={handleFilterChange} className="input-field" />
+            <label htmlFor="search-term" className="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input id="search-term" type="text" name="searchTerm" placeholder="Tên môn, mã môn, mã lớp..." value={filters.searchTerm} onChange={handleFilterChange} className="mt-1 block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
         </div>
         {isTeacher && (
@@ -631,14 +646,14 @@ const CourseManagement = () => {
                 <div className="flex justify-between items-center pt-4">
                     <div>
                         {editingCourse && (
-                            <button type="button" onClick={() => handleDelete(editingCourse._id)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                            <button type="button" onClick={() => handleDelete(editingCourse._id)} className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all">
                                 Xóa
                             </button>
                         )}
                     </div>
                     <div className="flex space-x-2">
-                        <button type="button" onClick={resetForm} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Hủy</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                        <button type="button" onClick={resetForm} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all">Hủy</button>
+                        <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">
                             {editingCourse ? 'Cập nhật' : 'Tạo mới'}
                         </button>
                     </div>
@@ -825,7 +840,7 @@ const CourseManagement = () => {
           );
       })()}
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
+      <div className="bg-white shadow-md overflow-hidden sm:rounded-xl">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -868,8 +883,8 @@ const CourseManagement = () => {
                       {course.isActive ? 'Hoạt động' : 'Đã khóa'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={(e) => { e.stopPropagation(); handleClickCourse(e, course); }} className="text-red-600 hover:text-red-800 font-semibold">Xem lịch</button>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); handleClickCourse(e, course); }} className="text-blue-600 hover:text-blue-800 font-semibold">Xem lịch</button>
                   </td>
                 </tr>
               ))}

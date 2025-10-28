@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Users, 
-  BookOpen, 
-  ClipboardList, 
+import {
+  Users,
+  BookOpen,
+  ClipboardList,
   Calendar,
   TrendingUp,
   AlertCircle,
   CheckCircle,
   Clock,
-  XCircle,
   Plus,
-  Eye
+  Eye,
+  ShieldCheck
 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -300,7 +300,7 @@ const AdminDashboard = () => {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Registrations */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white rounded-xl shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium text-gray-900">Đăng ký gần đây</h3>
@@ -314,31 +314,26 @@ const AdminDashboard = () => {
           </div>
           <div className="p-6">
             {recentRegistrations.length > 0 ? (
-              <div className="space-y-4">
+              <ul className="space-y-4">
                 {recentRegistrations.map((registration) => (
-                  <div key={registration._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
+                  <li key={registration._id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full ${getStatusColor(registration.status)}`}>
+                        <Clock className="h-5 w-5" />
+                      </div>
+                      <div>
                       <p className="text-sm font-medium text-gray-900">
-                        {registration.course?.courseName || 'Khóa học'}
-                      </p>
-                      <p className="text-xs text-gray-500">
                         {registration.student?.firstName} {registration.student?.lastName}
                       </p>
+                      <p className="text-xs text-gray-500">
+                        Đăng ký: {registration.course?.subject?.subjectName || 'N/A'}
+                      </p>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(registration.status)}`}>
-                        {getStatusDisplayName(registration.status)}
-                      </span>
-                      <Link
-                        to={`/admin/registrations/${registration._id}`}
-                        className="text-blue-600 hover:text-blue-500"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </div>
-                  </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(registration.status)}`}>{getStatusDisplayName(registration.status)}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
               <p className="text-gray-500 text-sm text-center py-4">Chưa có đăng ký nào</p>
             )}
@@ -346,7 +341,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Recent Users */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white rounded-xl shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium text-gray-900">Người dùng gần đây</h3>
@@ -360,33 +355,24 @@ const AdminDashboard = () => {
           </div>
           <div className="p-6">
             {recentUsers.length > 0 ? (
-              <div className="space-y-4">
+              <ul className="space-y-4">
                 {recentUsers.map((user) => (
-                  <div key={user._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
+                  <li key={user._id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=random`} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+                      <div>
                       <p className="text-sm font-medium text-gray-900">
                         {user.firstName} {user.lastName}
                       </p>
                       <p className="text-xs text-gray-500">{user.email}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        user.role === 'student' ? 'bg-blue-100 text-blue-800' :
-                        user.role === 'teacher' ? 'bg-green-100 text-green-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {getRoleDisplayName(user.role)}
-                      </span>
-                      <Link
-                        to={`/admin/users/${user._id}`}
-                        className="text-blue-600 hover:text-blue-500"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </div>
-                  </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.role === 'admin' ? 'bg-red-100 text-red-800' : user.role === 'teacher' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                      {getRoleDisplayName(user.role)}
+                    </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
               <p className="text-gray-500 text-sm text-center py-4">Chưa có người dùng nào</p>
             )}
@@ -395,23 +381,23 @@ const AdminDashboard = () => {
       </div>
 
       {/* System Status */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="bg-white rounded-xl shadow-sm p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Trạng thái hệ thống</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <CheckCircle className="mx-auto h-8 w-8 text-green-600 mb-2" />
             <p className="text-sm font-medium text-green-900">Hệ thống hoạt động</p>
-            <p className="text-xs text-green-600">Tất cả dịch vụ đang chạy</p>
+            <p className="text-xs text-gray-500">Tất cả dịch vụ đang chạy</p>
           </div>
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <TrendingUp className="mx-auto h-8 w-8 text-blue-600 mb-2" />
             <p className="text-sm font-medium text-blue-900">Hiệu suất tốt</p>
-            <p className="text-xs text-blue-600">Phản hồi nhanh</p>
+            <p className="text-xs text-gray-500">Phản hồi nhanh</p>
           </div>
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
-            <AlertCircle className="mx-auto h-8 w-8 text-purple-600 mb-2" />
-            <p className="text-sm font-medium text-purple-900">Cần chú ý</p>
-            <p className="text-xs text-purple-600">{stats.pendingRegistrations} đăng ký chờ duyệt</p>
+          <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <ShieldCheck className="mx-auto h-8 w-8 text-gray-600 mb-2" />
+            <p className="text-sm font-medium text-gray-900">Bảo mật</p>
+            <p className="text-xs text-gray-500">Hệ thống được bảo vệ</p>
           </div>
         </div>
       </div>

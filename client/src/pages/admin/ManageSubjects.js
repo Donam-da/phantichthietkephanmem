@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -108,17 +108,26 @@ const ManageSubjects = () => {
     };
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Quản lý Môn học</h1>
-                <button onClick={() => openModal()} className="btn btn-primary">
-                    <Plus className="h-5 w-5 mr-2" />
+        <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Quản lý Môn học</h1>
+                    <p className="mt-1 text-sm text-gray-600">Thêm, sửa, và quản lý các môn học trong chương trình đào tạo.</p>
+                </div>
+                <button 
+                    onClick={() => openModal()} 
+                    className="mt-4 sm:mt-0 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                >
                     Thêm Môn học
                 </button>
             </div>
 
-            {isLoading ? <p>Đang tải...</p> : (
-                <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            {isLoading ? (
+                <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+                </div>
+            ) : (
+                <div className="bg-white shadow-md rounded-xl overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
@@ -130,7 +139,7 @@ const ManageSubjects = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {subjects.map((subject) => (
-                                <tr key={subject._id} onClick={() => openModal(subject)} className="hover:bg-gray-50 cursor-pointer">
+                                <tr key={subject._id} onDoubleClick={() => openModal(subject)} className="hover:bg-gray-50 cursor-pointer">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{subject.subjectCode}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{subject.subjectName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{subject.credits}</td>
@@ -146,7 +155,7 @@ const ManageSubjects = () => {
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-10 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+                    <div className="relative top-10 mx-auto p-6 border w-full max-w-lg shadow-lg rounded-xl bg-white">
                         <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
                             {currentSubject ? 'Chỉnh sửa Môn học' : 'Thêm Môn học mới'}
                         </h3>
@@ -184,16 +193,17 @@ const ManageSubjects = () => {
                             <div className="flex items-center justify-between mt-6">
                                 <div>
                                     {currentSubject && (
-                                        <button type="button" onClick={() => handleDelete(currentSubject._id)} className="btn btn-danger">
+                                        <button type="button" onClick={() => handleDelete(currentSubject._id)} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all">
+                                            <Trash2 className="h-4 w-4" />
                                             Xóa môn học
                                         </button>
                                     )}
                                 </div>
                                 <div className="flex space-x-3">
-                                    <button type="button" onClick={closeModal} className="btn btn-secondary">
+                                    <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all">
                                         Hủy
                                     </button>
-                                    <button type="submit" className="btn btn-primary">
+                                    <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">
                                         Lưu
                                     </button>
                                 </div>

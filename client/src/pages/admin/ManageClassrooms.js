@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, X, Clock, ArrowRight } from 'lucide-react';
+import { Trash2, X, Clock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -195,17 +195,26 @@ const ManageClassrooms = () => {
     };
 
     return (
-        <div className="p-6">
-            <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-gray-900">Quản lý Phòng học</h1>
-                <button onClick={() => openModal()} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2">
-                    <Plus size={18} />
+        <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Quản lý Phòng học</h1>
+                    <p className="mt-1 text-sm text-gray-600">Thêm, sửa, và quản lý các phòng học và lịch khóa phòng.</p>
+                </div>
+                <button 
+                    onClick={() => openModal()} 
+                    className="mt-4 sm:mt-0 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                >
                     Thêm Phòng học
                 </button>
             </div>
 
-            {isLoading ? <p>Đang tải...</p> : (
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            {isLoading ? (
+                <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+                </div>
+            ) : (
+                <div className="bg-white shadow-md rounded-xl overflow-hidden">
                     <ul className="divide-y divide-gray-200">
                         {classrooms.map((room) => (
                             <li
@@ -253,8 +262,8 @@ const ManageClassrooms = () => {
             )}
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                    <div className="relative p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div className="relative p-6 border w-full max-w-lg shadow-lg rounded-xl bg-white">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-medium text-gray-900">{currentClassroom ? 'Chỉnh sửa' : 'Thêm'} Phòng học</h3>
                             <button onClick={closeModal} className="p-1 rounded-full hover:bg-gray-200">
@@ -352,16 +361,17 @@ const ManageClassrooms = () => {
                             <div className="flex justify-between items-center pt-4">
                                 <div>
                                     {currentClassroom && (
-                                        <button type="button" onClick={() => handleDelete(currentClassroom._id)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                                        <button type="button" onClick={() => handleDelete(currentClassroom._id)} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all">
+                                            <Trash2 className="h-4 w-4" />
                                             Xóa
                                         </button>
                                     )}
                                 </div>
                                 <div className="flex space-x-2">
-                                    <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
+                                    <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all">
                                         Hủy
                                     </button>
-                                    <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                                    <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">
                                         {currentClassroom ? 'Cập nhật' : 'Tạo mới'}
                                     </button>
                                 </div>

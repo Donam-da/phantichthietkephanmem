@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import Header from './Header'; // Import Header mới
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import Header from './Header';
 import {
-  Home,
   BookOpen,
   ClipboardList,
   User,
@@ -15,14 +13,15 @@ import {
   Building, // Thêm icon Building
   GraduationCap,
   DoorOpen, // Thêm icon cho Phòng học
-  BookCopy // Thêm icon cho Môn học
+  BookCopy, // Thêm icon cho Môn học
+  LogOut,
+  LayoutDashboard,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 // --- REFACTOR: Create a reusable NavigationMenu component ---
 const NavigationMenu = ({ userRole, onLinkClick }) => {
   const location = useLocation();
-  const isActive = (href) => location.pathname === href;
-
   // --- REFACTOR: Centralize navigation logic ---
   const getNavigation = () => {
     const baseNav = [
@@ -32,28 +31,31 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
     if (userRole === 'admin') {
       return {
         general: [
-          { name: 'Dashboard', href: '/admin', icon: Home },
+          { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
         ],
-        admin: [
-          { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
-          { name: 'Quản lý giảng viên', href: '/admin/teachers', icon: GraduationCap },
-          { name: 'Quản lý khóa học', href: '/admin/courses', icon: BookOpen },
-          { name: 'Quản lý trường', href: '/admin/schools', icon: Building },
-          { name: 'Quản lý môn học', href: '/admin/subjects', icon: BookCopy },
-          { name: 'Quản lý phòng học', href: '/admin/classrooms', icon: DoorOpen },
-          { name: 'Quản lý đăng ký', href: '/admin/registrations', icon: ClipboardList },
-          { name: 'Quản lý học kỳ', href: '/admin/semesters', icon: Calendar },
-        ]
+        collapsible: { // New structure for collapsible menu
+          name: 'Quản trị',
+          icon: Settings,
+          items: [
+            { name: 'Người dùng', href: '/admin/users', icon: Users },
+            { name: 'Giảng viên', href: '/admin/teachers', icon: GraduationCap },
+            { name: 'Môn học', href: '/admin/subjects', icon: BookCopy },
+            { name: 'Lớp học phần', href: '/admin/courses', icon: BookOpen },
+            { name: 'Học kỳ', href: '/admin/semesters', icon: Calendar },
+            { name: 'Phòng học', href: '/admin/classrooms', icon: DoorOpen },
+            { name: 'Trường/Khoa', href: '/admin/schools', icon: Building },
+            { name: 'Đăng ký', href: '/admin/registrations', icon: ClipboardList },
+          ]
+        }
       };
     }
 
     if (userRole === 'teacher') {
       return {
         general: [
-          { name: 'Dashboard', href: '/teacher/dashboard', icon: Home },
+          { name: 'Dashboard', href: '/teacher/dashboard', icon: LayoutDashboard },
           { name: 'Khóa học của tôi', href: '/admin/courses', icon: BookOpen },
           { name: 'Duyệt đăng ký', href: '/admin/registrations', icon: ClipboardList },
-          ...baseNav
         ]
       };
     }
@@ -61,7 +63,7 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
     // Default to student
     return {
       general: [
-        { name: 'Dashboard', href: '/dashboard', icon: Home },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Khóa học', href: '/courses', icon: BookOpen },
         { name: 'Đăng ký của tôi', href: '/my-registrations', icon: ClipboardList },
         ...baseNav
@@ -70,53 +72,72 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
   };
 
   const navConfig = getNavigation();
+  const { logout } = useAuth();
+  const [adminMenuOpen, setAdminMenuOpen] = useState(true); // State for collapsible admin menu
+
+  const getLinkClass = (path) => {
+    const baseClass = "group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-200";
+    const isActive = location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
+    return isActive
+      ? `${baseClass} bg-blue-200 text-blue-800 font-semibold`
+      : `${baseClass} text-gray-700 hover:bg-blue-100 hover:text-blue-800`;
+  };
+
+  // Determine if any item in the collapsible admin menu is active
+  const isAnyAdminMenuItemActive = navConfig.collapsible?.items.some(item => 
+    location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))
+  );
 
   return (
-    <nav className="flex-1 space-y-1 px-2 py-4">
-      {navConfig.general?.map((item) => (
-        <Link
-          key={item.name}
-          to={item.href}
-          className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-              ? 'bg-blue-100 text-blue-900'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          onClick={onLinkClick}
-        >
-          <item.icon className="mr-3 h-5 w-5" />
-          {item.name}
-        </Link>
-      ))}
+    <div className="flex flex-col flex-grow">
+      <nav className="flex-1 space-y-1 px-3 py-4">
+        {navConfig.general?.map((item) => (
+          <Link key={item.name} to={item.href} className={getLinkClass(item.href)} onClick={onLinkClick}>
+            <item.icon className="mr-3 h-5 w-5" />
+            {item.name}
+          </Link>
+        ))}
 
-      {navConfig.admin && (
-        <>
-          <div className="pt-4 pb-2">
-            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Quản trị
-            </h3>
-          </div>
-          {navConfig.admin.map((item) => (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive(item.href)
-                  ? 'bg-blue-100 text-blue-900'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              onClick={onLinkClick}
+        {navConfig.collapsible && ( // Use navConfig.collapsible here
+          <>
+            <button 
+              onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+              className={`${getLinkClass('')} w-full flex items-center ${isAnyAdminMenuItemActive ? 'bg-blue-200 text-blue-800 font-semibold' : ''}`}
             >
-              <item.icon className="mr-3 h-5 w-5" />
-              {item.name}
-            </Link>
-          ))}
-        </>
-      )}
-    </nav>
+              <div className="flex items-center">
+                <navConfig.collapsible.icon className="mr-3 h-5 w-5" />
+                {navConfig.collapsible.name}
+              </div>
+            </button>
+            {adminMenuOpen && (
+              <div className="pl-5 space-y-1 mt-1">
+                {navConfig.collapsible.items.map((item) => (
+                  <Link key={item.name} to={item.href} className={getLinkClass(item.href)} onClick={onLinkClick}>
+                    <item.icon className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </nav>
+      <div className="px-3 py-4 border-t border-blue-200">
+        <Link to="/profile" className={getLinkClass('/profile')} onClick={onLinkClick}>
+          <User size={20} className="mr-3" />
+          <span>Hồ sơ</span>
+        </Link>
+        <button onClick={logout} className={`${getLinkClass('/logout')} w-full`}>
+          <LogOut size={20} className="mr-3" />
+          <span>Đăng xuất</span>
+        </button>
+      </div>
+    </div>
   );
 };
 
 const Layout = () => {
-  const { user, isAdmin, isTeacher } = useAuth();
+  const { isAdmin, isTeacher } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const userRole = isAdmin ? 'admin' : isTeacher ? 'teacher' : 'student';
@@ -126,9 +147,10 @@ const Layout = () => {
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white">
-          <div className="flex h-16 items-center justify-between px-4">
-            <h1 className="text-xl font-bold text-gray-900">Quản lý Tín chỉ</h1>
+        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-blue-50">
+          <div className="flex h-20 items-center justify-center px-4 border-b border-blue-200">
+            <img className="h-10 w-auto" src="/assets/images/logo.png" alt="Hệ thống Logo" />
+            <h1 className="text-2xl font-bold text-blue-800 ml-3">Hệ thống</h1>
             <button onClick={() => setSidebarOpen(false)}>
               <X className="h-6 w-6 text-gray-400" />
             </button>
@@ -139,9 +161,10 @@ const Layout = () => {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
-          <div className="flex items-center h-16 px-4 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-900">Quản lý Tín chỉ</h1>
+        <div className="flex flex-col flex-grow bg-blue-50 border-r border-gray-200">
+          <div className="flex items-center justify-center h-20 border-b border-blue-200">
+            <img className="h-10 w-auto" src="/assets/images/logo.png" alt="Hệ thống Logo" />
+            <h1 className="text-2xl font-bold text-blue-800 ml-3">Hệ thống</h1>
           </div>
           <NavigationMenu userRole={userRole} />
         </div>

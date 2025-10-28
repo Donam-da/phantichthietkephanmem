@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, UserPlus, Edit } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -100,19 +100,27 @@ const ManageTeachers = () => {
     };
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Quản lý Giảng viên</h1>
-                <button onClick={() => openModal()} className="btn btn-primary">
-                    <Plus className="h-5 w-5 mr-2" />
+        <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Quản lý Giảng viên</h1>
+                    <p className="mt-1 text-sm text-gray-600">Thêm, sửa, và quản lý tài khoản giảng viên trong hệ thống.</p>
+                </div>
+                <button 
+                    onClick={() => openModal()} 
+                    className="mt-4 sm:mt-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                >
+                    <UserPlus className="h-5 w-5" />
                     Thêm Giảng viên
                 </button>
             </div>
 
             {isLoading ? (
-                <p>Đang tải...</p>
+                <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+                </div>
             ) : (
-                <div className="bg-white shadow-md rounded-lg overflow-hidden">
+                <div className="bg-white shadow-md rounded-xl overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
@@ -125,6 +133,9 @@ const ManageTeachers = () => {
                                 <tr key={teacher._id} onClick={() => openModal(teacher)} className="hover:bg-gray-50 cursor-pointer">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{teacher.firstName} {teacher.lastName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{teacher.email}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <Edit className="h-5 w-5 text-gray-400" />
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -134,7 +145,7 @@ const ManageTeachers = () => {
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                    <div className="relative top-20 mx-auto p-6 border w-full max-w-md shadow-lg rounded-xl bg-white">
                         <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
                             {currentTeacher ? 'Chỉnh sửa Giảng viên' : 'Thêm Giảng viên mới'}
                         </h3>
@@ -154,16 +165,16 @@ const ManageTeachers = () => {
                             <div className="flex items-center justify-between mt-6">
                                 <div>
                                     {currentTeacher && (
-                                        <button type="button" onClick={() => handleDelete(currentTeacher._id)} className="btn btn-danger">
+                                        <button type="button" onClick={() => handleDelete(currentTeacher._id)} className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all">
                                             Xóa giảng viên
                                         </button>
                                     )}
                                 </div>
                                 <div className="flex space-x-3">
-                                    <button type="button" onClick={closeModal} className="btn btn-secondary">
+                                    <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all">
                                         Hủy
                                     </button>
-                                    <button type="submit" className="btn btn-primary">
+                                    <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">
                                         Lưu
                                     </button>
                                 </div>
