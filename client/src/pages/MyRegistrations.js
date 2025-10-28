@@ -293,7 +293,7 @@ const MyRegistrations = () => {
                         Đăng ký: {new Date(registration.registrationDate).toLocaleDateString('vi-VN')}
                       </span>
                     </div>
-                    {registration.hasConflict && (
+                    {registration.hasConflict && registration.semester?.isRegistrationOpen && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation(); // Ngăn không cho modal chi tiết mở ra

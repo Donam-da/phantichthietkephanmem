@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
         const courses = await Course.find(filter)
             .populate('subject', 'subjectCode subjectName credits schools')
             .populate('teacher', 'firstName lastName email')
-            .populate('semester', 'name code academicYear startDate endDate')
+            .populate('semester', 'name code academicYear startDate endDate registrationStartDate registrationEndDate')
             .populate('schedule.classroom', 'roomCode')
             .sort({ createdAt: -1 })
             .skip(skip)

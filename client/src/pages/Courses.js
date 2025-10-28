@@ -52,16 +52,29 @@ const Courses = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [semestersRes, subjectsRes] = await Promise.all([
-          api.get('/api/semesters?isActive=true'),
+        // Ưu tiên lấy học kỳ hiện tại, nếu không có thì lấy các học kỳ đang hoạt động
+        let currentSemesterRes;
+        try {
+          currentSemesterRes = await api.get('/api/semesters/current');
+        } catch (error) {
+          // Bỏ qua lỗi nếu không tìm thấy học kỳ hiện tại
+        }
+
+        const [allSemestersRes, subjectsRes] = await Promise.all([
+          api.get('/api/semesters'),
           api.get('/api/subjects')
         ]);
-        if (semestersRes.data) {
-          setSemesters(semestersRes.data);
-          if (semestersRes.data.length > 0) {
-            setFilters(prev => ({ ...prev, semester: semestersRes.data[0]._id }));
-          }
+
+        const allSemesters = allSemestersRes.data || [];
+        setSemesters(allSemesters);
+
+        // Thiết lập bộ lọc học kỳ mặc định
+        if (currentSemesterRes?.data?._id) {
+          setFilters(prev => ({ ...prev, semester: currentSemesterRes.data._id }));
+        } else if (allSemesters.length > 0) {
+          setFilters(prev => ({ ...prev, semester: allSemesters[0]._id }));
         }
+
         setSubjects(subjectsRes.data);
         fetchMyRegistrations(); // Call the registration fetch separately
       } catch (error) {
@@ -394,6 +407,10 @@ const Courses = () => {
 
             const isThisCourseRegistered = registrationForThisSubject && registrationForThisSubject.course?._id === course._id;
 
+            const isRegistrationPeriodOpen = course.semester &&
+              new Date() >= new Date(course.semester.registrationStartDate) &&
+              new Date() <= new Date(course.semester.registrationEndDate);
+
             const buttonText = isThisCourseRegistered ? 'Đã đăng ký' : registrationForThisSubject ? 'Đổi lớp' : 'Đăng ký';
             const buttonDisabled = !course.isActive || isThisCourseRegistered;
 
@@ -468,10 +485,10 @@ const Courses = () => {
                     <button
                       type="button"
                       onClick={(e) => handleRegisterClick(e, course)} // This will now handle both register and switch
-                      disabled={buttonDisabled}
+                      disabled={!isRegistrationPeriodOpen || buttonDisabled}
                       className={`flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white ${isThisCourseRegistered ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      {buttonText}
+                      {!isRegistrationPeriodOpen ? 'Hết hạn ĐK' : buttonText}
                     </button>
                   )}
                 </div>

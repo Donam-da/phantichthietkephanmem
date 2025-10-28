@@ -34,23 +34,13 @@ router.get('/', async (req, res) => {
 router.get('/current', async (req, res) => {
   try {
     const now = new Date();
-    let currentSemester;
-
-    // 1. Try to find a semester currently open for registration
-    currentSemester = await Semester.findOne({
+    
+    // Tìm học kỳ đang hoạt động mà ngày hiện tại nằm trong khoảng từ lúc bắt đầu đăng ký đến lúc kết thúc học kỳ
+    const currentSemester = await Semester.findOne({
       isActive: true,
-      registrationStartDate: { $lte: now },
-      registrationEndDate: { $gte: now }
-    }).sort({ startDate: 1 });
-
-    // 2. If none, find the semester currently in session
-    if (!currentSemester) {
-      currentSemester = await Semester.findOne({
-        isActive: true,
-        startDate: { $lte: now },
-        endDate: { $gte: now }
-      });
-    }
+      registrationStartDate: { $lte: now }, // Bắt đầu đăng ký phải trước hoặc bằng ngày hiện tại
+      endDate: { $gte: now } // Kết thúc học kỳ phải sau hoặc bằng ngày hiện tại
+    }).sort({ startDate: 1 }); // Sắp xếp để ưu tiên học kỳ bắt đầu sớm hơn nếu có trùng lặp
 
     if (!currentSemester) {
       return res.status(404).json({ message: 'Không tìm thấy học kỳ nào đang hoạt động.' });
