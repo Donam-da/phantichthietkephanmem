@@ -260,6 +260,10 @@ const Schedule = () => {
                                                                         <span>{slot.subjectName} ({slot.classCode})</span>
                                                                     </div>
                                                                     <div className="flex items-center text-gray-700">
+                                                                        <User size={14} className="mr-1.5" />
+                                                                        <span>{slot.teacher}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center text-gray-700">
                                                                         <MapPin size={14} className="mr-1.5" />
                                                                         <span>Phòng: {slot.classroom}</span>
                                                                     </div>
