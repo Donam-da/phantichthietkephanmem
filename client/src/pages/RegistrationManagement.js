@@ -198,22 +198,29 @@ const RegistrationManagement = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2 ml-4">
-                  {registration.status === 'pending' && (!isTeacher || registration.course?.teacher?._id === user.id) && (
-                    <>
-                      <button
-                        onClick={() => handleApprove(registration._id)}
-                        className="text-green-600 hover:text-green-900 text-sm font-medium"
-                      >
-                        Phê duyệt
-                      </button>
-                      <button
-                        onClick={() => handleReject(registration)}
-                        className="text-red-600 hover:text-red-900 text-sm font-medium"
-                      >
-                        Từ chối
-                      </button>
-                    </>
-                  )}
+                  {registration.status === 'pending' && (!isTeacher || registration.course?.teacher?._id === user.id) ? (
+                    new Date() > new Date(registration.semester.registrationEndDate) ? (
+                      <>
+                        <button
+                          onClick={() => handleApprove(registration._id)}
+                          className="text-green-600 hover:text-green-900 text-sm font-medium"
+                        >
+                          Phê duyệt
+                        </button>
+                        <button
+                          onClick={() => handleReject(registration)}
+                          className="text-red-600 hover:text-red-900 text-sm font-medium"
+                        >
+                          Từ chối
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded-md">
+                        Chờ hết hạn ĐK
+                        ({new Date(registration.semester.registrationEndDate).toLocaleDateString('vi-VN')})
+                      </div>
+                    )
+                  ) : null}
                 </div>
               </div>
             </li>

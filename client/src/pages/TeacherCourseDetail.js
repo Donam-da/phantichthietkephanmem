@@ -205,16 +205,22 @@ const TeacherCourseDetail = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                            {registration.status === 'pending' && !registration.rejectionRequest?.requested && (
-                                                <div className="flex justify-center items-center gap-4">
-                                                     <button onClick={() => handleApprove(registration._id)} className="text-green-600 hover:text-green-900" title="Duyệt">
-                                                        <Check className="h-5 w-5" />
-                                                    </button>
-                                                     <button onClick={() => handleReject(registration._id)} className="text-red-600 hover:text-red-900" title="Từ chối">
-                                                        <X className="h-5 w-5" />
-                                                    </button>
-                                                </div>
-                                            )}
+                                            {registration.status === 'pending' && !registration.rejectionRequest?.requested ? (
+                                                course.semester && new Date() > new Date(course.semester.registrationEndDate) ? (
+                                                    <div className="flex justify-center items-center gap-4">
+                                                        <button onClick={() => handleApprove(registration._id)} className="text-green-600 hover:text-green-900" title="Duyệt">
+                                                            <Check className="h-5 w-5" />
+                                                        </button>
+                                                        <button onClick={() => handleReject(registration._id)} className="text-red-600 hover:text-red-900" title="Từ chối">
+                                                            <X className="h-5 w-5" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-xs text-blue-600">
+                                                        Chờ hết hạn ĐK
+                                                    </div>
+                                                )
+                                            ) : null}
                                         </td>
                                     </tr>
                                 ))}

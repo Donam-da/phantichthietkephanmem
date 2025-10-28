@@ -3,18 +3,22 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const Registration = require('../models/Registration'); // Import Registration model
 const { auth } = require('../middleware/auth');
+const { admin } = require('../middleware/admin');
 
 const router = express.Router();
 
 // @route   POST /api/auth/register
 // @desc    Register a new user
-// @access  Public
-router.post('/register', [ 
+// @access  Private (Admin Only) - Changed from Public to prevent self-registration
+router.post('/register', [
+    auth,
+    admin,
     body('fullName', 'Họ và tên là bắt buộc').not().isEmpty(),
     body('email', 'Please include a valid email').isEmail(),
     body('password', 'Password must be at least 6 characters').isLength({ min: 6 }),
-    body('role', 'Role is required').isIn(['student', 'teacher', 'admin'])
+    body('role', 'Role is required').isIn(['student', 'teacher']) // Admin should be created via a separate, more secure process
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -133,9 +137,21 @@ router.post('/login', [
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Fix for negative credits issue
-        if (user.currentCredits < 0) {
-            user.currentCredits = 0;
+        // --- NEW: Recalculate and sync currentCredits on login ---
+        if (user.role === 'student') {
+            const approvedRegistrations = await Registration.find({
+                student: user._id,
+                status: { $in: ['approved', 'pending'] } // Bao gồm cả 'pending'
+            }).populate({
+                path: 'course',
+                select: 'subject',
+                populate: { path: 'subject', select: 'credits' }
+            });
+
+            const recalculatedCredits = approvedRegistrations.reduce((total, reg) => {
+                return total + (reg.course?.subject?.credits || 0);
+            }, 0);
+            user.currentCredits = recalculatedCredits;
         }
 
         // Update last login

@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BookOpen,
   Clock,
@@ -7,10 +6,10 @@ import {
   User,
   AlertCircle,
   CheckCircle,
-  XCircle,  
-  Eye, // Keep Eye for potential use in modal
+  XCircle,
   Trash2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -20,92 +19,10 @@ const MyRegistrations = () => {
   const [filter, setFilter] = useState('all');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRegistration, setSelectedRegistration] = useState(null);
+  const { user } = useAuth(); // Lấy thông tin user từ AuthContext
 
   const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
   const periodNames = { 1: 'Ca 1 (6h45-9h25)', 2: 'Ca 2 (9h40-12h10)', 3: 'Ca 3 (13h-15h30)', 4: 'Ca 4 (15h45-18h25)' };
-
-  useEffect(() => {
-    fetchRegistrations();
-  }, []);
-
-  const getDatesForDayOfWeek = useCallback((semester, dayOfWeek) => {
-    if (!semester || !dayOfWeek || !semester.startDate || !semester.endDate) return [];
-
-    const dates = [];
-    // JS getDay(): 0=Sun, 1=Mon, ..., 6=Sat
-    // My format: 2=Mon, ..., 7=Sat, 8=Sun
-    const jsDayOfWeek = dayOfWeek === 8 ? 0 : dayOfWeek - 1;
-
-    // Create dates in UTC to avoid timezone issues
-    const startDate = new Date(semester.startDate);
-    startDate.setUTCHours(0, 0, 0, 0);
-    const endDate = new Date(semester.endDate);
-    endDate.setUTCHours(0, 0, 0, 0);
-
-    let currentDate = new Date(startDate);
-
-    // Find the first occurrence of the day
-    while (currentDate.getUTCDay() !== jsDayOfWeek) {
-      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-      if (currentDate > endDate) return [];
-    }
-
-    // Loop through the weeks
-    while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
-      currentDate.setUTCDate(currentDate.getUTCDate() + 7);
-    }
-
-    return dates;
-  }, []);
-
-  const generateDetailedSchedule = useCallback((registration) => {
-    if (!registration || !registration.course || !registration.course.semester) return [];
-
-    const course = registration.course;
-    const detailedSchedule = [];
-    course.schedule.forEach(scheduleItem => {
-      const dates = getDatesForDayOfWeek(course.semester, scheduleItem.dayOfWeek); // course.semester is the full object
-      dates.forEach(date => {
-        // Calculate start (Monday) and end (Sunday) of the week for the given date
-        const day = date.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-        const diffToMonday = day === 0 ? -6 : 1 - day; // Adjust for Sunday (getDay() returns 0 for Sunday)
-        const startOfWeek = new Date(date);
-        startOfWeek.setUTCDate(date.getUTCDate() + diffToMonday);
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
-
-        let session = '';
-        if ([1, 2].includes(scheduleItem.period)) session = 'Sáng';
-        if ([3, 4].includes(scheduleItem.period)) session = 'Chiều';
-
-        let startingPeriod = '';
-        switch (scheduleItem.period) {
-          case 1: startingPeriod = '1-3'; break;
-          case 2: startingPeriod = '4-6'; break;
-          case 3: startingPeriod = '7-9'; break;
-          case 4: startingPeriod = '10-12'; break;
-          default: break;
-        }
-
-        detailedSchedule.push({
-          dateObject: date, // Add the date object for sorting
-          session,
-          startOfWeek: startOfWeek.toLocaleDateString('vi-VN'),
-          endOfWeek: endOfWeek.toLocaleDateString('vi-VN'),
-          day: `${dayOfWeekNames[scheduleItem.dayOfWeek]} - ${date.toLocaleDateString('vi-VN')}`, // Include specific date
-          numberOfPeriods: 3, // Assuming 3 periods per session
-          startingPeriod,
-          classroom: scheduleItem.classroom?.roomCode || 'N/A',
-          teacher: `${course.teacher?.firstName} ${course.teacher?.lastName}`,
-        });
-      });
-    });
-
-    // Sort the entire schedule by date, then by period
-    detailedSchedule.sort((a, b) => a.dateObject - b.dateObject);
-    return detailedSchedule;
-  }, [getDatesForDayOfWeek, dayOfWeekNames, periodNames]);
 
   const fetchRegistrations = async () => {
     try {
@@ -119,6 +36,10 @@ const MyRegistrations = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRegistrations();
+  }, []);
 
   const handleDrop = async () => {
     if (!selectedRegistration) return;
@@ -136,6 +57,24 @@ const MyRegistrations = () => {
     } catch (error) {
       console.error('Error dropping course:', error);
       toast.error(error.response?.data?.message || 'Không thể xóa khóa học');
+    }
+  };
+
+  const handleDropFromList = async (registrationToDrop) => {
+    if (!registrationToDrop) return;
+
+    if (!window.confirm(`Bạn có chắc chắn muốn hủy lớp học phần "${registrationToDrop.course?.subject?.subjectName}"?`)) {
+      return;
+    }
+
+    const toastId = toast.loading('Đang hủy lớp học phần...');
+    try {
+      await api.delete(`/api/registrations/${registrationToDrop._id}`);
+      toast.success('Đã hủy lớp học phần thành công!', { id: toastId });
+      fetchRegistrations(); // Tải lại danh sách để cập nhật giao diện
+    } catch (error) {
+      console.error('Error dropping course from list:', error);
+      toast.error(error.response?.data?.message || 'Không thể hủy lớp học phần', { id: toastId });
     }
   };
 
@@ -180,12 +119,6 @@ const MyRegistrations = () => {
     return registration.status === filter;
   });
 
-  const getTotalCredits = () => {
-    return filteredRegistrations
-      .filter(r => r.status === 'approved')
-      .reduce((total, r) => total + (r.course?.credits || 0), 0);
-  };
-
   const openDetailModal = (registration) => {
     setSelectedRegistration(registration);
     setShowDetailModal(true);
@@ -193,6 +126,13 @@ const MyRegistrations = () => {
 
   const hasAnyConflict = filteredRegistrations.some(r => r.hasConflict);
   const hasAnySubjectConflict = filteredRegistrations.some(r => r.hasSubjectConflict);
+
+  // Tính toán lại tổng số tín chỉ từ danh sách đăng ký đã được duyệt
+  const totalApprovedCredits = useMemo(() => {
+    return registrations
+      .filter(r => ['approved', 'pending'].includes(r.status)) // Bao gồm cả 'pending'
+      .reduce((total, r) => total + (r.course?.subject?.credits || 0), 0);
+  }, [registrations]);
 
   if (loading) {
     return (
@@ -261,7 +201,7 @@ const MyRegistrations = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Tín chỉ hiện tại</p>
-              <p className="text-2xl font-semibold text-gray-900">{getTotalCredits()}</p>
+              <p className="text-2xl font-semibold text-gray-900">{totalApprovedCredits}</p>
             </div>
           </div>
         </div>
@@ -340,10 +280,9 @@ const MyRegistrations = () => {
       {filteredRegistrations.length > 0 ? (
         <div className="space-y-4">
           {filteredRegistrations.map((registration) => (
-            <div key={registration._id} className={`bg-white rounded-lg shadow-sm border ${registration.hasConflict ? 'border-red-500 ring-2 ring-red-200' : registration.hasSubjectConflict ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'}`}>
-              <div className="p-6">
-                <div className="flex items-start justify-between cursor-pointer"
-                     onClick={() => openDetailModal(registration)}>
+            <div key={registration._id} className={`bg-white rounded-lg shadow-sm border ${registration.hasConflict ? 'border-red-500 ring-2 ring-red-200' : registration.hasSubjectConflict ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'}`} onDoubleClick={() => openDetailModal(registration)}>
+              <div className="p-6 cursor-pointer">
+                <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-3">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(registration.status)}`}>
@@ -354,6 +293,17 @@ const MyRegistrations = () => {
                         Đăng ký: {new Date(registration.registrationDate).toLocaleDateString('vi-VN')}
                       </span>
                     </div>
+                    {registration.hasConflict && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Ngăn không cho modal chi tiết mở ra
+                          handleDropFromList(registration);
+                        }}
+                        className="absolute top-4 right-4 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      >
+                        <XCircle className="h-4 w-4 mr-1" /> Hủy lớp
+                      </button>
+                    )}
 
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
                       {registration.course?.subject?.subjectName}
@@ -438,7 +388,7 @@ const MyRegistrations = () => {
             </p>
             {filter === 'all' && (
               <p className="text-sm text-gray-500 mt-1">
-                Tổng tín chỉ đã đăng ký: {getTotalCredits()}
+                Tổng tín chỉ đã đăng ký: {totalApprovedCredits}
               </p>
             )}
           </div>
@@ -517,8 +467,8 @@ const MyRegistrations = () => {
                   onClick={handleDrop}
                   className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Xóa đăng ký
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Hủy lớp học phần
                 </button>
               )}
               <button onClick={() => setShowDetailModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">

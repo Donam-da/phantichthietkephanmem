@@ -52,18 +52,11 @@ const Dashboard = () => {
           const courses = coursesRes.data.courses;
           const currentSemester = semesterRes.data;
 
-          // Calculate credits only from approved courses
-          const approvedCredits = registrations
-            .filter(r => r.status === 'approved')
-            .reduce((total, r) => {
-              return total + (r.course?.subject?.credits || 0);
-            }, 0);
-
           setStats({
             totalCourses: courses.length,
             enrolledCourses: registrations.filter(r => r.status === 'approved').length,
             completedCourses: registrations.filter(r => r.status === 'completed').length,
-            currentCredits: approvedCredits,
+            currentCredits: user.currentCredits || 0, // Sử dụng trực tiếp tín chỉ từ user object
             maxCredits: currentSemester?.maxCreditsPerStudent || user.maxCredits || 24
           });
           setCurrentSemester(currentSemester);
@@ -111,7 +104,7 @@ const Dashboard = () => {
 
   const getStatusDisplayName = (status) => {
     switch (status) {
-      case 'approved': return 'Thành công';
+      case 'approved': return 'Đã duyệt';
       case 'pending': return 'Chờ duyệt';
       case 'rejected': return 'Từ chối';
       case 'dropped': return 'Đã xóa';
@@ -314,6 +307,19 @@ const Dashboard = () => {
                 <p className="text-xs text-gray-500">Cập nhật thông tin cá nhân</p>
               </div>
             </button>
+
+            {stats.enrolledCourses > 0 && (
+              <button
+                onClick={() => navigate('/schedule')} // Điều hướng đến trang thời khóa biểu
+                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              >
+                <Calendar className="h-6 w-6 text-red-600 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Xem thời khóa biểu</p>
+                  <p className="text-xs text-gray-500">Lịch học chi tiết của bạn</p>
+                </div>
+              </button>
+            )}
           </div>
         </div>
       </div>

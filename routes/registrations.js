@@ -64,7 +64,7 @@ router.get('/', auth, async (req, res) => {
           { path: 'schedule.classroom', select: 'roomCode' }
         ]
       })
-      .populate('semester', 'name code academicYear')
+      .populate('semester', 'name code academicYear registrationStartDate registrationEndDate')
       .populate('approvedBy', 'firstName lastName')
       .sort({ registrationDate: -1 })
       .skip(skip)
@@ -212,9 +212,10 @@ router.post('/', [
 
     // Check if student has enough credits available
     const student = await User.findById(req.user.id);
-    if (student.currentCredits + course.subject.credits > student.maxCredits) {
+    const maxCreditsForSemester = semester.maxCreditsPerStudent || student.maxCredits;
+    if (student.currentCredits + course.subject.credits > maxCreditsForSemester) {
       return res.status(400).json({
-        message: `Cannot register. Would exceed maximum credits (${student.maxCredits})`
+        message: `Không thể đăng ký. Sẽ vượt quá tín chỉ tối đa của học kỳ này (${maxCreditsForSemester}).`
       });
     }
 
@@ -267,10 +268,12 @@ router.post('/', [
       course: courseId,
       semester: semesterId,
       status: 'pending',
-      paymentAmount: course.fee
     });
 
     await registration.save();
+
+    // Cập nhật tín chỉ cho sinh viên ngay lập tức, nhưng sĩ số sẽ chỉ tăng khi được duyệt
+    await User.findByIdAndUpdate(req.user.id, { $inc: { currentCredits: course.subject.credits } });
 
 
     // Populate fields for response
@@ -338,11 +341,20 @@ router.post('/switch', [
       return res.status(400).json({ message: 'Lớp học phần mới không tồn tại hoặc đã đầy.' });
     }
 
-    // --- LOGIC: Handle student count and credits when switching from an approved course ---
-    if (oldReg.status === 'approved') {
+    // --- NEW: Check for credit limit on switch ---
+    const student = await User.findById(req.user.id);
+    const oldCredits = oldReg.course?.subject?.credits || 0;
+    const newCredits = newCourse.subject?.credits || 0;
+    if (student.currentCredits - oldCredits + newCredits > student.maxCredits) {
+        return res.status(400).json({
+            message: `Không thể đổi lớp. Sẽ vượt quá tín chỉ tối đa (${student.maxCredits}).`
+        });
+    }
+
+    // --- LOGIC: Handle student count and credits when switching from an approved or pending course ---
+    if (oldReg.status === 'approved' || oldReg.status === 'pending') {
       await Course.findByIdAndUpdate(oldReg.course._id, { $inc: { currentStudents: -1 } });
-      // Also decrement student's total credits
-      const student = await User.findById(req.user.id);
+      // Decrement student's total credits for the old course
       await User.findByIdAndUpdate(student._id, { $inc: { currentCredits: -oldReg.course.subject.credits } });
     }
 
@@ -355,9 +367,12 @@ router.post('/switch', [
       student: req.user.id,
       course: newCourseId,
       semester: oldReg.semester,
-      status: 'pending'
+      status: 'pending',
     });
     await newReg.save();
+
+    // Cập nhật tín chỉ cho sinh viên cho lớp mới
+    await User.findByIdAndUpdate(req.user.id, { $inc: { currentCredits: newCourse.subject.credits } });
 
     res.status(201).json({ message: 'Chuyển lớp thành công!', registration: newReg });
   } catch (error) {
@@ -379,12 +394,14 @@ router.put('/:id/approve', auth, async (req, res) => {
     const registration = await Registration.findById(req.params.id)
       .populate({
         path: 'course',
-        select: 'teacher', // Select the teacher field
+        select: 'teacher subject', // Select the teacher and subject field
         populate: {
           path: 'subject',
           select: 'credits'
         }
-      }).populate('student'); // Also populate student for credit update
+      })
+      .populate('student') // Also populate student for credit update
+      .populate('semester', 'registrationEndDate'); // Populate semester to check registration date
 
     if (!registration) {
       return res.status(404).json({ message: 'Registration not found' });
@@ -399,17 +416,20 @@ router.put('/:id/approve', auth, async (req, res) => {
       return res.status(400).json({ message: 'Registration is not pending' });
     }
 
+    // --- NEW: Check if registration period is over ---
+    const now = new Date();
+    if (now < new Date(registration.semester.registrationEndDate)) {
+      return res.status(400).json({ message: `Không thể phê duyệt khi thời gian đăng ký chưa kết thúc (kết thúc vào ${new Date(registration.semester.registrationEndDate).toLocaleDateString('vi-VN')}).` });
+    }
+
     registration.status = 'approved';
     registration.approvalDate = new Date();
     registration.approvedBy = req.user.id;
 
     await registration.save();
 
-    // Atomically update course's student count and student's credit count
+    // Atomically update course's student count. Credits were already added when registration was pending.
     await Course.findByIdAndUpdate(registration.course._id, { $inc: { currentStudents: 1 } });
-    await User.findByIdAndUpdate(registration.student, {
-      $inc: { currentCredits: registration.course.subject.credits }
-    });
 
     // Populate fields for response
     await registration.populate([
@@ -476,6 +496,11 @@ router.put('/:id/reject', [
         registration.status = 'rejected';
         registration.rejectionReason = reason;
         registration.approvedBy = req.user.id;
+
+        // --- NEW: Decrement credits since the pending registration is now rejected ---
+        if (registration.course.subject?.credits > 0) {
+            await User.findByIdAndUpdate(registration.student, { $inc: { currentCredits: -registration.course.subject.credits } });
+        }
     }
 
     registration.notes = `Rejected by ${req.user.role}: ${reason}`;
@@ -539,12 +564,12 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(400).json({ message: `Không thể hủy đăng ký ở trạng thái "${registration.status}".` });
     }
 
-    // Only decrease counts if the registration was approved
-    if (registration.status === 'approved') {
-      // Update course current students count
-      await Course.findByIdAndUpdate(registration.course._id, { $inc: { currentStudents: -1 } });
+    // Decrease counts if the registration was approved or pending
+    if (registration.status === 'approved' || registration.status === 'pending') {
+      // Update course current students count only if it was approved
+      if (registration.status === 'approved') await Course.findByIdAndUpdate(registration.course._id, { $inc: { currentStudents: -1 } });
       // Atomically update student's credit count
-      await User.findByIdAndUpdate(req.user.id, { $inc: { currentCredits: -registration.course.subject.credits } });
+      if (registration.course.subject?.credits > 0) await User.findByIdAndUpdate(req.user.id, { $inc: { currentCredits: -registration.course.subject.credits } });
     }
 
     // Delete the registration document entirely
