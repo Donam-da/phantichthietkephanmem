@@ -41,6 +41,10 @@ const UserSchema = new mongoose.Schema({
             return this.role === 'student';
         }
     },
+    teachingSchools: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'School'
+    }],
     year: {
         type: Number,
         required: function() { return this.role === 'student'; },

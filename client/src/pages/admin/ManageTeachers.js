@@ -7,6 +7,7 @@ import ConfirmPasswordModal from '../../components/ConfirmPasswordModal';
 const ManageTeachers = () => {
     const [teachers, setTeachers] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [allSchools, setAllSchools] = useState([]); // NEW: State to store all schools
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentTeacher, setCurrentTeacher] = useState(null);
@@ -16,6 +17,7 @@ const ManageTeachers = () => {
         email: '',
         password: '',
         isActive: true,
+        teachingSchools: [], // NEW: Add teachingSchools to formData
     });
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState(null);
@@ -23,6 +25,7 @@ const ManageTeachers = () => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [importFile, setImportFile] = useState(null);
     const [importResults, setImportResults] = useState(null);
+    const [isImporting, setIsImporting] = useState(false); // State for import loading
     const [selectedTeachers, setSelectedTeachers] = useState([]);
 
     const getAuthHeaders = () => {
@@ -30,10 +33,11 @@ const ManageTeachers = () => {
         return { headers: { 'x-auth-token': token } };
     };
 
+    // NEW: Fetch all schools
     const fetchTeachers = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await axios.get('/api/users?role=teacher', getAuthHeaders());
+            const res = await axios.get('/api/users?role=teacher&populateSchools=true', getAuthHeaders());
             setTeachers(res.data.users);
         } catch (error) {
             toast.error('Không thể tải danh sách giảng viên.');
@@ -42,10 +46,23 @@ const ManageTeachers = () => {
             setIsLoading(false);
         }
     }, []);
+    const fetchAllSchools = useCallback(async () => {
+        try {
+            const res = await axios.get('/api/schools', getAuthHeaders());
+            setAllSchools(res.data);
+        } catch (error) {
+            toast.error('Không thể tải danh sách trường.');
+            console.error(error);
+        }
+    }, []);
 
     useEffect(() => {
         fetchTeachers();
-    }, [fetchTeachers]);
+        fetchAllSchools(); // NEW: Fetch all schools on mount
+    }, [fetchTeachers, fetchAllSchools]);
+
+
+
 
     const normalizeText = (str) => {
         if (!str) return '';
@@ -68,6 +85,16 @@ const ManageTeachers = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // NEW: Handle multi-select for teachingSchools
+    const handleTeachingSchoolChange = (schoolId) => {
+        setFormData(prev => {
+            const newSchools = prev.teachingSchools.includes(schoolId)
+                ? prev.teachingSchools.filter(id => id !== schoolId)
+                : [...prev.teachingSchools, schoolId];
+            return { ...prev, teachingSchools: newSchools };
+        });
+    };
+
     const openModal = (teacher = null) => {
         setCurrentTeacher(teacher);
         if (teacher) {
@@ -76,10 +103,11 @@ const ManageTeachers = () => {
                 lastName: teacher.lastName,
                 email: teacher.email,
                 isActive: teacher.isActive,
-                password: '',
+                password: '', // Luôn để trống mật khẩu
+                teachingSchools: teacher.teachingSchools.map(s => s._id), // NEW: Populate teachingSchools
             });
         } else {
-            setFormData({ firstName: '', lastName: '', email: '', password: '', isActive: true });
+            setFormData({ firstName: '', lastName: '', email: '', password: '', isActive: true, teachingSchools: [] }); // NEW: Reset teachingSchools
         }
         setIsModalOpen(true);
     };
@@ -87,12 +115,20 @@ const ManageTeachers = () => {
     const closeModal = () => {
         setIsModalOpen(false);
         setCurrentTeacher(null);
-        setFormData({ firstName: '', lastName: '', email: '', password: '', isActive: true });
+        setFormData({ firstName: '', lastName: '', email: '', password: '', isActive: true, teachingSchools: [] }); // NEW: Reset teachingSchools
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const payload = { ...formData, role: 'teacher' };
+        const payload = {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            password: formData.password,
+            isActive: formData.isActive,
+            role: 'teacher',
+            teachingSchools: formData.teachingSchools, // NEW: Include teachingSchools in payload
+        };
 
         if (currentTeacher && !payload.password) {
             delete payload.password;
@@ -182,6 +218,7 @@ const ManageTeachers = () => {
 
     const closeImportModal = () => {
         setIsImportModalOpen(false);
+        window.location.reload();
     };
 
     const handleImportFileChange = (e) => {
@@ -198,17 +235,17 @@ const ManageTeachers = () => {
         const formData = new FormData();
         formData.append('file', importFile);
 
-        const toastId = toast.loading('Đang nhập dữ liệu giảng viên...');
+        setIsImporting(true);
         try {
             const res = await axios.post('/api/users/import-teachers', formData, {
                 headers: { ...getAuthHeaders().headers, 'Content-Type': 'multipart/form-data' }
             });
-            toast.success(res.data.msg, { id: toastId });
             setImportResults(res.data);
-            fetchTeachers();
+            fetchTeachers(); // Tải lại danh sách giảng viên trong nền
         } catch (error) {
-            toast.error(error.response?.data?.msg || 'Lỗi khi nhập dữ liệu.', { id: toastId });
             setImportResults(error.response?.data || { failedCount: 1, errors: [{ msg: 'Lỗi không xác định.' }] });
+        } finally {
+            setIsImporting(false);
         }
     };
 
@@ -279,6 +316,7 @@ const ManageTeachers = () => {
                                     </th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Họ và tên</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Email</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Trường giảng dạy</th> {/* NEW: Column for teaching schools */}
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Trạng thái</th>
                                 </tr>
                             </thead>
@@ -290,6 +328,11 @@ const ManageTeachers = () => {
                                         </td>
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center cursor-pointer">{teacher.firstName} {teacher.lastName}</td>
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center cursor-pointer">{teacher.email}</td>
+                                        <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center cursor-pointer">
+                                            {teacher.teachingSchools && teacher.teachingSchools.length > 0
+                                                ? teacher.teachingSchools.map(s => s.schoolCode).join(', ')
+                                                : 'N/A'}
+                                        </td> {/* NEW: Display teaching schools */}
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-center cursor-pointer">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${teacher.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                 {teacher.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}
@@ -345,6 +388,29 @@ const ManageTeachers = () => {
                                         <label htmlFor="isActive" className="ml-2 block text-sm text-gray-900">{formData.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}</label>
                                     </div>
                                 </div>
+                                {/* NEW: Multi-select for teachingSchools */}
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700">Giảng dạy tại các trường</label>
+                                    <div className="mt-2 border border-gray-200 rounded-md max-h-40 overflow-y-auto p-2">
+                                        {allSchools.length > 0 ? (
+                                            allSchools.map(school => (
+                                                <div key={school._id} className="flex items-center py-1">
+                                                    <input
+                                                        id={`school-${school._id}`}
+                                                        name="teachingSchools"
+                                                        type="checkbox"
+                                                        checked={formData.teachingSchools.includes(school._id)}
+                                                        onChange={() => handleTeachingSchoolChange(school._id)}
+                                                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                                    />
+                                                    <label htmlFor={`school-${school._id}`} className="ml-3 block text-sm text-gray-700">{school.schoolName} ({school.schoolCode})</label>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">Không có trường nào để chọn.</p>
+                                        )}
+                                    </div>
+                                </div>
                                 <div className="flex items-center justify-between mt-6">
                                     <div>
                                         {currentTeacher && (
@@ -381,6 +447,7 @@ const ManageTeachers = () => {
                             <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
                                 Nhập Giảng viên từ tệp CSV
                             </h3>
+                        {!importResults ? (
                             <form onSubmit={handleImportSubmit}>
                                 <div className="mb-4">
                                     <label htmlFor="importFile" className="block text-sm font-medium text-gray-700">Chọn tệp CSV</label>
@@ -394,33 +461,38 @@ const ManageTeachers = () => {
                                         required
                                     />
                                     <p className="mt-2 text-xs text-gray-500">
-                                        Tệp phải có 3 cột: `Họ và tên`, `email`, `mật khẩu`.
+                                        Các cột: `Họ và tên`, `email`, `mật khẩu`, `Trường giảng dạy` (tùy chọn). Các mã trường cách nhau bởi dấu chấm phẩy (;).
                                     </p>
-                                </div>
-
-                                {importResults && (
-                                    <div className="mt-4 p-3 bg-gray-50 rounded-md border">
-                                        <p className="text-sm font-medium text-gray-800">Kết quả nhập:</p>
-                                        <p className="text-sm text-gray-700">Tổng số dòng đã xử lý: {importResults.processedCount}</p>
-                                        <p className="text-sm text-green-600">Thêm thành công: {importResults.importedCount}</p>
-                                        {importResults.failedCount > 0 && (
-                                            <div className="text-sm text-red-600">
-                                                Thất bại: {importResults.failedCount}
-                                                <ul className="list-disc list-inside mt-2 text-xs">
-                                                    {importResults.errors.map((err, index) => (
-                                                        <li key={index}>Email '{err.row.email || 'không xác định'}': {err.msg}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
                                     </div>
-                                )}
-
                                 <div className="flex justify-end space-x-3 mt-6">
                                     <button type="button" onClick={closeImportModal} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all">Đóng</button>
-                                    <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">Tải lên và Nhập</button>
+                                    <button type="submit" disabled={isImporting || !importFile} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all disabled:opacity-50">
+                                        {isImporting ? 'Đang xử lý...' : 'Tải lên và Nhập'}
+                                    </button>
                                 </div>
                             </form>
+                        ) : (
+                            <div>
+                                <div className="p-4 bg-gray-50 rounded-md border max-h-64 overflow-y-auto">
+                                    <p className="text-sm font-medium text-gray-800">Kết quả nhập:</p>
+                                    <p className="text-sm text-gray-700 mt-2">Tổng số dòng đã xử lý: {importResults.processedCount}</p>
+                                    <p className="text-sm text-green-600">Thêm thành công: {importResults.importedCount}</p>
+                                    {importResults.failedCount > 0 && (
+                                        <div className="text-sm text-red-600 mt-2">
+                                            Thất bại: {importResults.failedCount}
+                                            <ul className="list-disc list-inside mt-2 text-xs space-y-1">
+                                                {importResults.errors.map((err, index) => (
+                                                    <li key={index}>Email '{err.row.email || 'không xác định'}': {err.msg}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex justify-end mt-6">
+                                    <button type="button" onClick={closeImportModal} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">Thoát</button>
+                                </div>
+                            </div>
+                        )}
                         </div>
                     </div>
                 )}

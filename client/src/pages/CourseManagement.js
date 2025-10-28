@@ -35,6 +35,13 @@ const CourseManagement = () => {
     isActive: true, // Thêm trường isActive
   });
 
+  // Helper for displaying room types
+  const roomTypeNames = {
+    computer_lab: 'Phòng máy',
+    theory: 'Lý thuyết',
+    lab: 'Thực hành',
+    lecture_hall: 'Giảng đường',
+  };
   const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
   const periodNames = { 1: 'Ca 1 (6h45-9h25)', 2: 'Ca 2 (9h40-12h10)', 3: 'Ca 3 (13h-15h30)', 4: 'Ca 4 (15h45-18h25)' }; // Giữ lại dòng này
   const [showScheduleDetailModal, setShowScheduleDetailModal] = useState(false);
@@ -84,7 +91,7 @@ const CourseManagement = () => {
           api.get('/api/classrooms'),
         ];
         if (!isTeacher) {
-          apiCalls.push(api.get('/api/users?role=teacher'));
+          apiCalls.push(api.get('/api/users?role=teacher&populateSchools=true')); // NEW: Request teachers with populated schools
         }
         const [subjectsRes, semestersRes, classroomsRes, teachersRes] = await Promise.all(apiCalls);
 
@@ -108,7 +115,7 @@ const CourseManagement = () => {
       }
     };
     fetchStaticData();
-  }, [isTeacher]);
+  }, [isTeacher]); // Removed user from dependency array as it's not directly used here
 
   const fetchCourses = useCallback(async () => {
     if (!filters.semester) return;
@@ -131,7 +138,7 @@ const CourseManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters.semester, isTeacher, user?.id]); // FIX: Depend on user.id for stability
+  }, [filters.semester, isTeacher, user?.id]);
 
   // NEW: Effect to sync course status on component mount for admins
   useEffect(() => {
@@ -379,20 +386,57 @@ const CourseManagement = () => {
     setPopoverPosition({ x: e.clientX, y: e.clientY });
   };
 
-  const filteredCourses = courses.filter(course => {
-    // Teacher specific filter
-    if (isTeacher && filters.onlyMyCourses && course.teacher?._id !== user.id) {
-      return false;
-    }
+  const filteredCourses = courses
+    .filter(course => {
+      // Teacher specific filter
+      if (isTeacher && filters.onlyMyCourses && course.teacher?._id !== user.id) {
+        return false;
+      }
 
-    const term = filters.searchTerm.toLowerCase();
-    const subjectMatch = !filters.subject || course.subject?._id === filters.subject;
-    const searchMatch = !term || 
-      course.subject?.subjectName.toLowerCase().includes(term) ||
-      course.subject?.subjectCode.toLowerCase().includes(term) ||
-      course.classCode.toLowerCase().includes(term);
-    return subjectMatch && searchMatch;
-  });
+      const term = filters.searchTerm.toLowerCase();
+      const subjectMatch = !filters.subject || course.subject?._id === filters.subject;
+      const searchMatch = !term ||
+        course.subject?.subjectName.toLowerCase().includes(term) ||
+        course.subject?.subjectCode.toLowerCase().includes(term) ||
+        course.classCode.toLowerCase().includes(term);
+      return subjectMatch && searchMatch;
+    })
+    .sort((a, b) => {
+      // Nếu đang lọc theo môn học, sắp xếp theo mã lớp
+      if (filters.subject) {
+        return a.classCode.localeCompare(b.classCode, undefined, { numeric: true });
+      }
+      return 0; // Giữ nguyên thứ tự mặc định nếu không lọc theo môn học
+    });
+
+  // Filter classrooms based on selected subject's preferred room types
+  const filteredClassroomsForSchedule = React.useMemo(() => {
+    if (!formData.subject) {
+      return classrooms; // If no subject selected, show all classrooms
+    }
+    const selectedSubject = subjects.find(sub => sub._id === formData.subject);
+    if (!selectedSubject || !selectedSubject.preferredRoomTypes || selectedSubject.preferredRoomTypes.length === 0) {
+      // If subject not found or no preferred types, default to showing only theory rooms
+      return classrooms.filter(cr => cr.roomType === 'theory');
+    }
+    const preferredTypes = selectedSubject.preferredRoomTypes;
+    return classrooms.filter(cr => preferredTypes.includes(cr.roomType));
+  }, [formData.subject, subjects, classrooms]);
+
+  // NEW: Filter teachers based on selected subject's schools
+  const filteredTeachersForSubject = React.useMemo(() => {
+    if (!formData.subject) {
+      return teachers; // If no subject selected, show all teachers
+    }
+    const selectedSubject = subjects.find(sub => sub._id === formData.subject);
+    if (!selectedSubject || !selectedSubject.schools || selectedSubject.schools.length === 0) {
+      return teachers; // If subject not found or no schools, show all teachers
+    }
+    const subjectSchoolIds = selectedSubject.schools.map(s => s._id.toString());
+    return teachers.filter(teacher =>
+      teacher.teachingSchools && teacher.teachingSchools.some(ts => subjectSchoolIds.includes(ts._id.toString()))
+    );
+  }, [formData.subject, subjects, teachers]);
 
   if (loading) {
     return (
@@ -586,7 +630,7 @@ const CourseManagement = () => {
                   <label className="block text-sm font-medium text-gray-700">Giảng viên</label>
                   <select value={formData.teacher} onChange={(e) => setFormData({ ...formData, teacher: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Tạm thời chưa có giảng viên</option>
-                    {teachers.map(t => <option key={t._id} value={t._id}>{t.firstName} {t.lastName}</option>)}
+                    {filteredTeachersForSubject.map(t => <option key={t._id} value={t._id}>{t.firstName} {t.lastName}</option>)}
                   </select>
                   {editingCourse && (
                     <div className="mt-2 flex items-center">
@@ -625,8 +669,8 @@ const CourseManagement = () => {
                       <div className="col-span-3">
                         <label className="block text-sm font-medium text-gray-700">Phòng</label>
                         <select value={item.classroom} onChange={(e) => handleScheduleChange(index, 'classroom', e.target.value)} className="mt-1 input-field">
-                          <option value="">Chọn phòng</option>                          
-                          {classrooms.map(cr => {
+                          <option value="">Chọn phòng</option>
+                          {filteredClassroomsForSchedule.map(cr => { // Use filtered classrooms here
                             const slotKey = `${item.dayOfWeek}-${item.period}-${cr._id}`;
                             const isOccupied = occupiedSlots.has(slotKey);
                             return (

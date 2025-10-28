@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Course = require('../models/Course'); // Import Course model
 const verifyAdminPassword = require('../middleware/verifyAdminPassword');
+const School = require('../models/School');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
 const multer = require('multer');
@@ -29,7 +30,7 @@ router.post('/', [
     }
 
     const { email, password, firstName, lastName, role, studentId, school } = req.body;
-
+    const { teachingSchools } = req.body; // NEW: Get teachingSchools from body
     try {
         let user = await User.findOne({ email });
         if (user) {
@@ -51,6 +52,7 @@ router.post('/', [
             role,
             studentId: role === 'student' ? studentId : undefined,
             school: role === 'student' ? school : undefined,
+            teachingSchools: role === 'teacher' ? teachingSchools : undefined, // NEW: Assign teachingSchools for teachers
         });
 
         await user.save();
@@ -68,12 +70,16 @@ router.post('/', [
 // @access  Private (Admin)
 router.get('/', [auth, admin], async (req, res) => {
     try {
-        const { role } = req.query;
+        const { role, populateSchools } = req.query; // NEW: Get populateSchools query param
         const query = {};
         if (role) {
             query.role = role;
         }
-        const users = await User.find(query)
+        let usersQuery = User.find(query);
+        if (populateSchools === 'true') { // NEW: Conditionally populate teachingSchools
+            usersQuery = usersQuery.populate('teachingSchools', 'schoolCode schoolName');
+        }
+        const users = await usersQuery
             .select('-password')
             .populate('school', 'schoolName')
             // Sắp xếp: tài khoản vô hiệu hóa (isActive: false) lên đầu, sau đó sắp xếp theo tên
@@ -175,7 +181,7 @@ router.put('/:id', [
             return res.status(404).json({ msg: 'Không tìm thấy người dùng' });
         }
         
-        const { firstName, lastName, email, isActive } = req.body;
+        const { firstName, lastName, email, isActive, teachingSchools } = req.body; // NEW: Get teachingSchools
         // --- LOGIC MỚI: Xử lý khi vô hiệu hóa một giảng viên ---
         // Nếu người dùng bị vô hiệu hóa (isActive: false) và là một giảng viên
         if (isActive === false && userToUpdate.role === 'teacher') {
@@ -213,6 +219,7 @@ router.put('/:id', [
             userToUpdate.email = email;
         }
         if (typeof isActive !== 'undefined') userToUpdate.isActive = isActive;
+        if (userToUpdate.role === 'teacher' && teachingSchools) userToUpdate.teachingSchools = teachingSchools; // NEW: Update teachingSchools
 
         await userToUpdate.save();
 
@@ -311,8 +318,13 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
 
     const errors = [];
     const importedTeachers = [];
+    const schoolMap = new Map();
 
     try {
+        // Lấy tất cả các trường để tạo map
+        const allSchools = await School.find().select('_id schoolCode');
+        allSchools.forEach(s => schoolMap.set(s.schoolCode.toUpperCase(), s._id));
+
         const fileContent = fs.readFileSync(req.file.path, 'utf8');
         const rows = fileContent.split(/\r?\n/).filter(line => line.trim() !== '');
 
@@ -324,18 +336,34 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
             const emailForRow = parts.length > 1 ? parts[1].trim() : 'không xác định';
 
             if (parts.length < 3) {
-                errors.push({ row: { email: emailForRow }, msg: 'Dòng không đủ 3 cột (Họ và tên, email, mật khẩu).' });
+                errors.push({ row: { email: emailForRow }, msg: 'Dòng không đủ 3 cột bắt buộc (Họ và tên, email, mật khẩu).' });
                 continue;
             }
 
             const fullName = parts[0].trim();
             const email = parts[1].trim();
             const password = parts[2].trim();
+            const teachingSchoolsStr = (parts[3] || '').trim(); // Cột thứ 4, tùy chọn
 
             if (!fullName || !email || !password) {
                 errors.push({ row: { email }, msg: 'Thiếu thông tin bắt buộc.' });
                 continue;
             }
+
+            // Xử lý các trường giảng dạy
+            const schoolCodes = teachingSchoolsStr.split(';').map(s => s.trim().toUpperCase()).filter(Boolean);
+            const schoolIds = [];
+            let allSchoolsFound = true;
+            for (const code of schoolCodes) {
+                if (schoolMap.has(code)) {
+                    schoolIds.push(schoolMap.get(code));
+                } else {
+                    errors.push({ row: { email }, msg: `Mã trường '${code}' không tồn tại.` });
+                    allSchoolsFound = false;
+                    break;
+                }
+            }
+            if (!allSchoolsFound) continue;
 
             // Kiểm tra email đã tồn tại chưa
             const existingUser = await User.findOne({ email });
@@ -348,16 +376,21 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
             const lastName = nameParts.pop() || '';
             const firstName = nameParts.join(' ');
 
-            const newTeacher = new User({
-                firstName,
-                lastName,
-                email,
-                password,
-                role: 'teacher'
-            });
+            try {
+                const newTeacher = new User({
+                    firstName,
+                    lastName,
+                    email,
+                    password,
+                    role: 'teacher',
+                    teachingSchools: schoolIds,
+                });
 
-            await newTeacher.save();
-            importedTeachers.push(newTeacher);
+                await newTeacher.save();
+                importedTeachers.push(newTeacher);
+            } catch (dbErr) {
+                errors.push({ row: { email }, msg: `Lỗi lưu vào DB: ${dbErr.message}` });
+            }
         }
 
         fs.unlinkSync(req.file.path); // Xóa tệp tạm
