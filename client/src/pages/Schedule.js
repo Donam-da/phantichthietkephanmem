@@ -154,15 +154,14 @@ const Schedule = () => {
         for (let d = 1; d <= daysInMonth; d++) {
             const dayDate = new Date(year, month, d);
             const isToday = dayDate.toDateString() === new Date().toDateString();
-            const startOfWeekForDay = getStartOfWeek(dayDate);
-            const isSelectedWeek = startOfWeekForDay.getTime() === getStartOfWeek(currentWeekStart).getTime();
+            const isSelectedDay = dayDate.toDateString() === currentWeekStart.toDateString();
 
             daysInMonthArr.push(
                 <td key={d} className="p-1">
                     <button
                         onClick={() => setCurrentWeekStart(dayDate)}
                         className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors
-                            ${isSelectedWeek ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}
+                            ${isSelectedDay ? 'bg-blue-600 text-white font-semibold' : 'hover:bg-gray-100'}
                             ${isToday ? 'ring-2 ring-blue-500' : ''}
                         `}
                     >
