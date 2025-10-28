@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Course = require('../models/Course');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
+const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 
 const router = express.Router();
 const periodTimes = { 1: "7:00-9:00", 2: "9:00-11:00", 3: "13:00-15:00", 4: "15:00-17:00" };
@@ -246,6 +247,57 @@ router.post('/sync-teacher-status', [auth, admin], async (req, res) => {
     } catch (error) {
         console.error('Error syncing course status:', error.message);
         res.status(500).json({ msg: 'Lỗi Server khi đồng bộ hóa trạng thái lớp học phần.' });
+    }
+});
+
+// @route   DELETE /api/courses
+// @desc    Delete multiple courses
+// @access  Private (Admin only)
+router.delete('/', [auth, admin, verifyAdminPassword], async (req, res) => {
+    const { courseIds } = req.body;
+
+    if (!courseIds || !Array.isArray(courseIds) || courseIds.length === 0) {
+        return res.status(400).json({ msg: 'Vui lòng cung cấp danh sách ID lớp học phần cần xóa.' });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const Registration = require('../models/Registration');
+        const User = require('../models/User');
+
+        // Find all registrations associated with the courses to be deleted
+        const registrationsToDelete = await Registration.find({ course: { $in: courseIds } }).populate('course', 'subject').session(session);
+
+        // Group registrations by student to perform credit updates efficiently
+        const studentCreditUpdates = {};
+        for (const reg of registrationsToDelete) {
+            if (reg.status === 'approved' && reg.course?.subject?.credits > 0) {
+                const studentId = reg.student.toString();
+                studentCreditUpdates[studentId] = (studentCreditUpdates[studentId] || 0) - reg.course.subject.credits;
+            }
+        }
+
+        // Apply credit updates in bulk
+        for (const studentId in studentCreditUpdates) {
+            await User.findByIdAndUpdate(studentId, { $inc: { currentCredits: studentCreditUpdates[studentId] } }).session(session);
+        }
+
+        // Delete all related registrations
+        await Registration.deleteMany({ course: { $in: courseIds } }).session(session);
+
+        // Finally, delete the courses
+        const result = await Course.deleteMany({ _id: { $in: courseIds } }).session(session);
+
+        await session.commitTransaction();
+        res.json({ msg: `Đã xóa thành công ${result.deletedCount} lớp học phần và các đăng ký liên quan.` });
+    } catch (error) {
+        await session.abortTransaction();
+        console.error(error.message);
+        res.status(500).json({ msg: 'Lỗi Server khi xóa lớp học phần.' });
+    } finally {
+        session.endSession();
     }
 });
 

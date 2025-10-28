@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import ConfirmPasswordModal from '../components/ConfirmPasswordModal';
 
 const CourseManagement = () => {
   const { user, isTeacher } = useAuth(); // Giữ lại dòng này
@@ -18,6 +19,11 @@ const CourseManagement = () => {
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
   const [statusNote, setStatusNote] = useState(null); // State for status popover
   const [occupiedSlots, setOccupiedSlots] = useState(new Set());
+  // State cho xóa hàng loạt
+  const [selectedCourses, setSelectedCourses] = useState([]);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [filters, setFilters] = useState({
     // ... (filters state remains the same)
     semester: '',
@@ -214,6 +220,61 @@ const CourseManagement = () => {
     setFormData({ ...formData, schedule: newSchedule });
   };
 
+  const filteredCourses = courses
+    .filter(course => {
+      // Teacher specific filter
+      if (isTeacher && filters.onlyMyCourses && course.teacher?._id !== user.id) {
+        return false;
+      }
+
+      const term = filters.searchTerm.toLowerCase();
+      const subjectMatch = !filters.subject || course.subject?._id === filters.subject;
+      const searchMatch = !term ||
+        course.subject?.subjectName.toLowerCase().includes(term) ||
+        course.subject?.subjectCode.toLowerCase().includes(term) ||
+        course.classCode.toLowerCase().includes(term);
+      return subjectMatch && searchMatch;
+    })
+    .sort((a, b) => {
+      // Nếu đang lọc theo môn học, sắp xếp theo mã lớp
+      if (filters.subject) {
+        return a.classCode.localeCompare(b.classCode, undefined, { numeric: true });
+      }
+      return 0; // Giữ nguyên thứ tự mặc định nếu không lọc theo môn học
+    });
+
+
+  // --- LOGIC XÓA HÀNG LOẠT ---
+  const handleSelectCourse = (id) => {
+    setSelectedCourses(prev => prev.includes(id) ? prev.filter(courseId => courseId !== id) : [...prev, id]);
+  };
+
+  const handleSelectAll = (e) => {
+    setSelectedCourses(e.target.checked ? filteredCourses.map(c => c._id) : []);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedCourses.length === 0) return;
+    setConfirmAction(() => (password) => executeDeleteSelected(password));
+    setIsConfirmModalOpen(true);
+  };
+
+  const executeDeleteSelected = async (password) => {
+    setIsConfirming(true);
+    const toastId = toast.loading(`Đang xóa ${selectedCourses.length} lớp học phần...`);
+    try {
+      await api.delete('/api/courses', { data: { courseIds: selectedCourses, password } });
+      toast.success('Xóa thành công!', { id: toastId });
+      setSelectedCourses([]);
+      triggerRefetch();
+    } catch (error) {
+      toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+    } finally {
+      setIsConfirming(false);
+      setIsConfirmModalOpen(false);
+    }
+  };
+
   const resetForm = () => {
     setEditingCourse(null);
     setShowForm(false);
@@ -386,28 +447,7 @@ const CourseManagement = () => {
     setPopoverPosition({ x: e.clientX, y: e.clientY });
   };
 
-  const filteredCourses = courses
-    .filter(course => {
-      // Teacher specific filter
-      if (isTeacher && filters.onlyMyCourses && course.teacher?._id !== user.id) {
-        return false;
-      }
-
-      const term = filters.searchTerm.toLowerCase();
-      const subjectMatch = !filters.subject || course.subject?._id === filters.subject;
-      const searchMatch = !term ||
-        course.subject?.subjectName.toLowerCase().includes(term) ||
-        course.subject?.subjectCode.toLowerCase().includes(term) ||
-        course.classCode.toLowerCase().includes(term);
-      return subjectMatch && searchMatch;
-    })
-    .sort((a, b) => {
-      // Nếu đang lọc theo môn học, sắp xếp theo mã lớp
-      if (filters.subject) {
-        return a.classCode.localeCompare(b.classCode, undefined, { numeric: true });
-      }
-      return 0; // Giữ nguyên thứ tự mặc định nếu không lọc theo môn học
-    });
+  const isAllSelected = filteredCourses.length > 0 && selectedCourses.length === filteredCourses.length;
 
   // Filter classrooms based on selected subject's preferred room types
   const filteredClassroomsForSchedule = React.useMemo(() => {
@@ -457,14 +497,25 @@ const CourseManagement = () => {
           {isTeacher ? 'Xem và quản lý các lớp học phần bạn được phân công.' : 'Tạo, chỉnh sửa và quản lý tất cả các lớp học phần trong hệ thống.'}
         </p>
         </div>
-        {!isTeacher && (
-          <button 
-            onClick={() => setShowForm(true)} 
-            className="mt-4 sm:mt-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Thêm lớp mới</span>
-          </button>
+        {!isTeacher && ( // Chỉ hiển thị các nút này cho admin
+          <div className="flex items-center gap-2 mt-4 sm:mt-0">
+            {selectedCourses.length > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all"
+              >
+                <Trash2 className="h-5 w-5" />
+                Xóa ({selectedCourses.length})
+              </button>
+            )}
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Thêm lớp mới</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -910,6 +961,13 @@ const CourseManagement = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                {!isTeacher && (
+                  <th scope="col" className="px-6 py-3 text-left">
+                    <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                  </th>
+                )}
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Môn học</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giảng viên</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lịch học</th>
@@ -921,6 +979,15 @@ const CourseManagement = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredCourses.map((course) => ( // Giữ lại dòng này
                 <tr key={course._id} onDoubleClick={() => handleEdit(course)} className="hover:bg-gray-50 group cursor-pointer" onMouseEnter={() => setHoveredCourseId(course._id)} onMouseLeave={() => setHoveredCourseId(null)} onMouseMove={handleMouseMove}>
+                  {!isTeacher && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input type="checkbox"
+                        checked={selectedCourses.includes(course._id)}
+                        onChange={() => handleSelectCourse(course._id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="min-w-0">
