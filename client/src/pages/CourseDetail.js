@@ -214,9 +214,9 @@ const CourseDetail = () => {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
           <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-4">
-              <span className={`px-3 py-1 text-sm font-medium rounded-full ${getCategoryColor(course.category)}`}>
-                {getCategoryDisplayName(course.category)}
+            <div className="flex items-center space-x-3 mb-4"> 
+              <span className={`px-3 py-1 text-sm font-medium rounded-full ${getCategoryColor(course.subject?.category)}`}>
+                {getCategoryDisplayName(course.subject?.category)}
               </span>
               <span className={`px-3 py-1 text-sm font-medium rounded-full ${course.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
@@ -225,10 +225,10 @@ const CourseDetail = () => {
             </div>
 
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {course.courseName}
+              {course.subject?.subjectName}
             </h1>
-            <p className="text-xl text-gray-600 mb-4">{course.courseCode}</p>
-
+            <p className="text-xl text-gray-600 mb-4">{course.subject?.subjectCode} - {course.classCode}</p>
+ 
             {course.description && (
               <p className="text-gray-700 text-lg leading-relaxed">
                 {course.description}
@@ -245,7 +245,7 @@ const CourseDetail = () => {
                     <button
                       onClick={() => setShowRegistrationModal(true)}
                       disabled={!course.isActive}
-                      className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed w-full"
                     >
                       <BookOpen className="h-5 w-5 mr-2" />
                       Đăng ký khóa học
@@ -256,10 +256,15 @@ const CourseDetail = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <span className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${getStatusColor(registration.status)}`}>
-                      {getStatusDisplayName(registration.status)}
-                    </span>
-                    {registration.status === 'approved' && (
+                    <div className="flex items-center space-x-2">
+                      <span className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${getStatusColor(registration.status)}`}>
+                        {getStatusDisplayName(registration.status)}
+                      </span> 
+                      <span className="text-sm text-gray-600">
+                        Đăng ký ngày: {new Date(registration.registrationDate).toLocaleDateString('vi-VN')}
+                      </span>
+                    </div>
+                    {registration.status === 'approved' && registration.course?.semester?.withdrawalDeadline && new Date() < new Date(registration.course.semester.withdrawalDeadline) && (
                       <button
                         onClick={handleDrop}
                         className="inline-flex items-center justify-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
@@ -267,6 +272,9 @@ const CourseDetail = () => {
                         <XCircle className="h-4 w-4 mr-2" />
                         Xóa khóa học
                       </button>
+                    )}
+                    {registration.status === 'approved' && registration.course?.semester?.withdrawalDeadline && new Date() >= new Date(registration.course.semester.withdrawalDeadline) && (
+                      <p className="text-sm text-red-600">Đã hết hạn rút môn.</p>
                     )}
                   </div>
                 )}
@@ -294,23 +302,23 @@ const CourseDetail = () => {
           <div className="space-y-3">
             <div className="flex items-center text-sm">
               <BookOpen className="h-5 w-5 text-blue-500 mr-3" />
-              <span className="text-gray-600">Tín chỉ:</span>
-              <span className="ml-auto font-medium">{course.credits}</span>
+              <span className="text-gray-600">Số tín chỉ:</span>
+              <span className="ml-auto font-medium">{course.subject?.credits}</span>
             </div>
             <div className="flex items-center text-sm">
               <GraduationCap className="h-5 w-5 text-green-500 mr-3" />
               <span className="text-gray-600">Ngành:</span>
-              <span className="ml-auto font-medium">{course.major}</span>
+              <span className="ml-auto font-medium">{course.subject?.major || 'N/A'}</span>
             </div>
             <div className="flex items-center text-sm">
               <Calendar className="h-5 w-5 text-purple-500 mr-3" />
               <span className="text-gray-600">Năm:</span>
-              <span className="ml-auto font-medium">{course.yearLevel}</span>
+              <span className="ml-auto font-medium">{course.subject?.yearLevel || 'N/A'}</span>
             </div>
             <div className="flex items-center text-sm">
               <Clock className="h-5 w-5 text-orange-500 mr-3" />
-              <span className="text-gray-600">Học kỳ:</span>
-              <span className="ml-auto font-medium">{course.semesterNumber}</span>
+              <span className="text-gray-600">Học kỳ:</span> 
+              <span className="ml-auto font-medium">{course.semester?.semesterNumber || 'N/A'}</span>
             </div>
             <div className="flex items-center text-sm">
               <Users className="h-5 w-5 text-indigo-500 mr-3" />
@@ -467,7 +475,7 @@ const CourseDetail = () => {
               </h3>
               <p className="text-sm text-gray-500 mb-6">
                 Bạn có chắc chắn muốn đăng ký khóa học <strong>{course.courseName}</strong>?
-              </p>
+              </p> 
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowRegistrationModal(false)}

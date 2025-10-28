@@ -232,7 +232,11 @@ const Dashboard = () => {
           {recentRegistrations.length > 0 ? (
             <div className="space-y-4">
               {recentRegistrations.map((registration) => (
-                <div key={registration._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div
+                  key={registration._id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                  onClick={() => navigate('/my-registrations')}
+                >
                   <div className="flex items-center space-x-4">
                     <div className="flex-shrink-0">
                       <BookOpen className="h-6 w-6 text-blue-600" />
@@ -278,25 +282,34 @@ const Dashboard = () => {
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <button
+              onClick={() => navigate('/courses')}
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+            >
               <BookOpen className="h-6 w-6 text-blue-600 mr-3" />
-              <div className="text-left">
+              <div>
                 <p className="text-sm font-medium text-gray-900">Xem khóa học</p>
                 <p className="text-xs text-gray-500">Tìm và đăng ký khóa học mới</p>
               </div>
             </button>
 
-            <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <button
+              onClick={() => navigate('/my-registrations')}
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+            >
               <Calendar className="h-6 w-6 text-green-600 mr-3" />
-              <div className="text-left">
-                <p className="text-sm font-medium text-gray-900">Lịch học</p>
-                <p className="text-xs text-gray-500">Xem lịch học và lịch thi</p>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Lịch sử đăng kí</p>
+                <p className="text-xs text-gray-500">Xem lại các môn đã đăng ký</p>
               </div>
             </button>
 
-            <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+            >
               <User className="h-6 w-6 text-purple-600 mr-3" />
-              <div className="text-left">
+              <div>
                 <p className="text-sm font-medium text-gray-900">Hồ sơ</p>
                 <p className="text-xs text-gray-500">Cập nhật thông tin cá nhân</p>
               </div>

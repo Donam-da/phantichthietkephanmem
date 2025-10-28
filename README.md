@@ -1,66 +1,55 @@
-# Phần mềm Quản lý Đăng ký Học theo Tín chỉ
+# Hướng dẫn Cài đặt và Vận hành Hệ thống Đăng ký Tín chỉ
 
-Ứng dụng web quản lý việc đăng ký học theo tín chỉ cho sinh viên, giảng viên và quản trị viên.
+Đây là tài liệu hướng dẫn chi tiết các bước để cài đặt và chạy ứng dụng Quản lý Đăng ký Tín chỉ trên môi trường local.
 
 ## Tính năng chính
 
 ### Cho Sinh viên:
-- Đăng ký/xóa môn học
-- Xem lịch học và lịch thi
-- Theo dõi điểm số và GPA
-- Xem thông tin môn học và tài liệu
-- Quản lý hồ sơ cá nhân
+- Đăng ký và hủy đăng ký học phần.
+- Xem lịch học, lịch thi chi tiết.
+- Theo dõi tiến độ học tập và điểm số.
+- Quản lý thông tin hồ sơ cá nhân.
 
 ### Cho Giảng viên:
-- Quản lý khóa học
-- Nhập điểm và theo dõi sinh viên
-- Quản lý tài liệu và lịch học
-- Duyệt đăng ký môn học
+- Quản lý các lớp học phần được phân công.
+- Nhập và cập nhật điểm cho sinh viên.
+- Duyệt các yêu cầu đăng ký học phần của sinh viên.
 
 ### Cho Quản trị viên:
-- Quản lý người dùng (sinh viên, giảng viên)
-- Quản lý khóa học và học kỳ
-- Theo dõi thống kê đăng ký
-- Quản lý hệ thống
+- Quản lý toàn diện tài khoản người dùng (Sinh viên, Giảng viên, Admin).
+- Quản lý chương trình đào tạo, môn học, lớp học phần.
+- Cấu hình và quản lý các học kỳ trong năm.
+- Theo dõi và thống kê hoạt động của toàn hệ thống.
 
 ## Công nghệ sử dụng
 
 ### Backend:
 - Node.js + Express.js
 - MongoDB + Mongoose
-- JWT Authentication
-- Express Validator
-- Bcrypt (mã hóa mật khẩu)
+- Xác thực bằng JWT (JSON Web Token)
 
 ### Frontend:
 - React.js 18
 - React Router DOM
 - Tailwind CSS
-- React Hook Form
 - Axios (HTTP client)
 - Lucide React (icons)
+- React Hook Form & React Hot Toast
 
-## Cài đặt và chạy
+## Hướng dẫn Cài đặt
 
-### Yêu cầu hệ thống:
-- Node.js (v16 trở lên)
-- MongoDB (v4.4 trở lên)
-- npm hoặc yarn
+### Bước 1: Yêu cầu môi trường
+- **Node.js**: Phiên bản `16.x` trở lên.
+- **npm** hoặc **yarn**: Trình quản lý gói cho Node.js.
+- **MongoDB Community Server**: Hệ quản trị cơ sở dữ liệu.
+- **MongoDB Compass**: Công cụ giao diện đồ họa để quản lý MongoDB (khuyến khích).
 
-### Bước 1: Clone và cài đặt dependencies
+### Bước 2: Tải mã nguồn
 
 ```bash
 # Clone repository
-git clone <repository-url>
-cd phanmem
-
-# Cài đặt backend dependencies
-npm install
-
-# Cài đặt frontend dependencies
-cd client
-npm install
-cd ..
+git clone [URL_REPOSITORY_CỦA_BẠN]
+cd phantichthietkephanmem
 ```
 
 ### Bước 2: Cấu hình môi trường

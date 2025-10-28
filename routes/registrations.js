@@ -59,7 +59,7 @@ router.get('/', auth, async (req, res) => {
         select: 'subject classCode teacher schedule maxStudents currentStudents',
         populate: [
           { path: 'teacher', select: 'firstName lastName email' },
-          { path: 'subject', select: 'subjectCode subjectName credits' },
+          { path: 'subject', select: 'subjectCode subjectName credits major yearLevel category' },
           // NEW: Populate classroom details within the schedule
           { path: 'schedule.classroom', select: 'roomCode' }
         ]

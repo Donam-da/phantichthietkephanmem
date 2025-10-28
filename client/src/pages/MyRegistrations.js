@@ -1,31 +1,111 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import {
   BookOpen,
   Clock,
   Calendar,
-  MapPin,
   User,
   AlertCircle,
   CheckCircle,
   XCircle,  
-  Eye,
-  Download,
+  Eye, // Keep Eye for potential use in modal
   Trash2
 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const MyRegistrations = () => {
-  const { user } = useAuth();
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedRegistration, setSelectedRegistration] = useState(null);
+
+  const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
+  const periodNames = { 1: 'Ca 1 (6h45-9h25)', 2: 'Ca 2 (9h40-12h10)', 3: 'Ca 3 (13h-15h30)', 4: 'Ca 4 (15h45-18h25)' };
 
   useEffect(() => {
     fetchRegistrations();
   }, []);
+
+  const getDatesForDayOfWeek = useCallback((semester, dayOfWeek) => {
+    if (!semester || !dayOfWeek || !semester.startDate || !semester.endDate) return [];
+
+    const dates = [];
+    // JS getDay(): 0=Sun, 1=Mon, ..., 6=Sat
+    // My format: 2=Mon, ..., 7=Sat, 8=Sun
+    const jsDayOfWeek = dayOfWeek === 8 ? 0 : dayOfWeek - 1;
+
+    // Create dates in UTC to avoid timezone issues
+    const startDate = new Date(semester.startDate);
+    startDate.setUTCHours(0, 0, 0, 0);
+    const endDate = new Date(semester.endDate);
+    endDate.setUTCHours(0, 0, 0, 0);
+
+    let currentDate = new Date(startDate);
+
+    // Find the first occurrence of the day
+    while (currentDate.getUTCDay() !== jsDayOfWeek) {
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+      if (currentDate > endDate) return [];
+    }
+
+    // Loop through the weeks
+    while (currentDate <= endDate) {
+      dates.push(new Date(currentDate));
+      currentDate.setUTCDate(currentDate.getUTCDate() + 7);
+    }
+
+    return dates;
+  }, []);
+
+  const generateDetailedSchedule = useCallback((registration) => {
+    if (!registration || !registration.course || !registration.course.semester) return [];
+
+    const course = registration.course;
+    const detailedSchedule = [];
+    course.schedule.forEach(scheduleItem => {
+      const dates = getDatesForDayOfWeek(course.semester, scheduleItem.dayOfWeek); // course.semester is the full object
+      dates.forEach(date => {
+        // Calculate start (Monday) and end (Sunday) of the week for the given date
+        const day = date.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+        const diffToMonday = day === 0 ? -6 : 1 - day; // Adjust for Sunday (getDay() returns 0 for Sunday)
+        const startOfWeek = new Date(date);
+        startOfWeek.setUTCDate(date.getUTCDate() + diffToMonday);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
+
+        let session = '';
+        if ([1, 2].includes(scheduleItem.period)) session = 'Sáng';
+        if ([3, 4].includes(scheduleItem.period)) session = 'Chiều';
+
+        let startingPeriod = '';
+        switch (scheduleItem.period) {
+          case 1: startingPeriod = '1-3'; break;
+          case 2: startingPeriod = '4-6'; break;
+          case 3: startingPeriod = '7-9'; break;
+          case 4: startingPeriod = '10-12'; break;
+          default: break;
+        }
+
+        detailedSchedule.push({
+          dateObject: date, // Add the date object for sorting
+          session,
+          startOfWeek: startOfWeek.toLocaleDateString('vi-VN'),
+          endOfWeek: endOfWeek.toLocaleDateString('vi-VN'),
+          day: `${dayOfWeekNames[scheduleItem.dayOfWeek]} - ${date.toLocaleDateString('vi-VN')}`, // Include specific date
+          numberOfPeriods: 3, // Assuming 3 periods per session
+          startingPeriod,
+          classroom: scheduleItem.classroom?.roomCode || 'N/A',
+          teacher: `${course.teacher?.firstName} ${course.teacher?.lastName}`,
+        });
+      });
+    });
+
+    // Sort the entire schedule by date, then by period
+    detailedSchedule.sort((a, b) => a.dateObject - b.dateObject);
+    return detailedSchedule;
+  }, [getDatesForDayOfWeek, dayOfWeekNames, periodNames]);
 
   const fetchRegistrations = async () => {
     try {
@@ -40,15 +120,20 @@ const MyRegistrations = () => {
     }
   };
 
-  const handleDrop = async (registrationId) => {
+  const handleDrop = async () => {
+    if (!selectedRegistration) return;
+
     if (!window.confirm('Bạn có chắc chắn muốn xóa khóa học này?')) {
       return;
     }
 
     try {
-      await api.delete(`/api/registrations/${registrationId}`); // This call is now correct
+      await api.delete(`/api/registrations/${selectedRegistration._id}`);
       toast.success('Đã xóa khóa học thành công!');
-      window.location.reload(); // Reload the page to ensure UI is updated
+      // Update state to remove the dropped registration
+      setRegistrations(prev => prev.filter(reg => reg._id !== selectedRegistration._id));
+      setShowDetailModal(false); // Close modal after dropping
+      setSelectedRegistration(null); // Clear selected registration
     } catch (error) {
       console.error('Error dropping course:', error);
       toast.error(error.response?.data?.message || 'Không thể xóa khóa học');
@@ -100,6 +185,11 @@ const MyRegistrations = () => {
     return filteredRegistrations
       .filter(r => r.status === 'approved')
       .reduce((total, r) => total + (r.course?.credits || 0), 0);
+  };
+
+  const openDetailModal = (registration) => {
+    setSelectedRegistration(registration);
+    setShowDetailModal(true);
   };
 
   const hasAnyConflict = filteredRegistrations.some(r => r.hasConflict);
@@ -253,7 +343,8 @@ const MyRegistrations = () => {
           {filteredRegistrations.map((registration) => (
             <div key={registration._id} className={`bg-white rounded-lg shadow-sm border ${registration.hasConflict ? 'border-red-500 ring-2 ring-red-200' : registration.hasSubjectConflict ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'}`}>
               <div className="p-6">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between cursor-pointer"
+                     onClick={() => openDetailModal(registration)}>
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-3">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(registration.status)}`}>
@@ -284,30 +375,6 @@ const MyRegistrations = () => {
                         <span>{registration.semester?.name}</span>
                       </div>
                     </div>
-
-                    {/* Schedule */}
-                    {registration.course?.schedule && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-900 mb-2">Lịch học:</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {registration.course.schedule.map((session, index) => {
-                            const dayOfWeekNames = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ Nhật' };
-                            const periodNames = { 1: 'Ca 1', 2: 'Ca 2', 3: 'Ca 3', 4: 'Ca 4' };
-
-                            return (
-                              <div key={index} className="text-sm text-gray-600 flex items-center">
-                                <Calendar className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" />
-                                <span>
-                                  {dayOfWeekNames[session.dayOfWeek]}, {periodNames[session.period]}
-                                  {session.classroom?.roomCode && `, P. ${session.classroom.roomCode}`}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
                     {/* Grades */}
                     {registration.grade && (registration.grade.attendance || registration.grade.midterm || registration.grade.final) && (
                       <div className="mb-4">
@@ -340,27 +407,6 @@ const MyRegistrations = () => {
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="ml-6 flex flex-col space-y-2">
-                    <Link
-                      to={`/courses/${registration.course?._id || registration.course}`}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Chi tiết
-                    </Link>
-
-                    {registration.status === 'pending' && (
-                      <button
-                        onClick={() => handleDrop(registration._id)}
-                        className="inline-flex items-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Xóa
-                      </button>
                     )}
                   </div>
                 </div>
@@ -396,6 +442,87 @@ const MyRegistrations = () => {
                 Tổng tín chỉ đã đăng ký: {getTotalCredits()}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {showDetailModal && selectedRegistration && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Chi tiết Đăng ký: {selectedRegistration.course?.subject?.subjectName}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Lớp: {selectedRegistration.course?.classCode} - GV: {selectedRegistration.course?.teacher?.firstName} {selectedRegistration.course?.teacher?.lastName}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="p-2 -mt-2 -mr-2 rounded-full hover:bg-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Trạng thái:</p>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedRegistration.status)}`}>
+                    {getStatusIcon(selectedRegistration.status)}
+                    <span className="ml-2">{getStatusDisplayName(selectedRegistration.status)}</span>
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Ngày đăng ký:</p>
+                  <p className="font-medium text-gray-900">{new Date(selectedRegistration.registrationDate).toLocaleDateString('vi-VN')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Số tín chỉ:</p>
+                  <p className="font-medium text-gray-900">{selectedRegistration.course?.subject?.credits || selectedRegistration.course?.credits}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Học kỳ:</p>
+                  <p className="font-medium text-gray-900">{selectedRegistration.semester?.name}</p>
+                </div>
+              </div>
+
+              {/* Weekly Schedule */}
+              {selectedRegistration.course?.schedule && selectedRegistration.course.schedule.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Lịch học hàng tuần:</p>
+                  <div className="space-y-2 rounded-md border border-gray-200 p-4">
+                    {selectedRegistration.course.schedule.map((session, index) => (
+                      <div key={index} className="flex items-center text-sm text-gray-800">
+                        <Calendar className="h-4 w-4 mr-3 text-gray-400 flex-shrink-0" />
+                        <span>
+                          <span className="font-medium">{dayOfWeekNames[session.dayOfWeek]}</span>, {periodNames[session.period]}
+                          {session.classroom?.roomCode && <span className="ml-2 text-gray-500">(Phòng: {session.classroom.roomCode})</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              {selectedRegistration.status === 'pending' && (
+                <button
+                  onClick={handleDrop}
+                  className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Xóa đăng ký
+                </button>
+              )}
+              <button onClick={() => setShowDetailModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

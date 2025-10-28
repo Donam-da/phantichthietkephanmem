@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { body, validationResult } = require('express-validator'); // Thêm dòng này
 const Subject = require('../models/Subject');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
@@ -7,8 +8,23 @@ const { admin } = require('../middleware/admin');
 // @route   POST api/subjects
 // @desc    Tạo môn học mới
 // @access  Private (Admin)
-router.post('/', [auth, admin], async (req, res) => {
-    const { subjectCode, subjectName, credits, schools } = req.body;
+router.post('/', [
+    auth,
+    admin,
+    body('subjectCode', 'Mã môn học là bắt buộc').not().isEmpty(),
+    body('subjectName', 'Tên môn học là bắt buộc').not().isEmpty(),
+    body('credits', 'Số tín chỉ là bắt buộc và phải là số').isInt({ min: 0 }),
+    body('schools', 'Vui lòng chọn ít nhất một trường').isArray({ min: 1 }),
+    body('major', 'Ngành là bắt buộc').not().isEmpty(),
+    body('yearLevel', 'Năm học là bắt buộc và phải là số').isInt({ min: 1, max: 5 }),
+    body('category', 'Loại môn học là bắt buộc').isIn(['required', 'elective', 'general'])
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { subjectCode, subjectName, credits, schools, major, yearLevel, category } = req.body;
     try {
         if (!schools || schools.length === 0) {
             return res.status(400).json({ msg: 'Vui lòng chọn ít nhất một trường' });
@@ -19,7 +35,7 @@ router.post('/', [auth, admin], async (req, res) => {
             return res.status(400).json({ msg: 'Mã môn học đã tồn tại' });
         }
 
-        subject = new Subject({ subjectCode, subjectName, credits, schools });
+        subject = new Subject({ subjectCode, subjectName, credits, schools, major, yearLevel, category });
         await subject.save();
         await subject.populate('schools', 'schoolCode schoolName');
         res.status(201).json(subject);
@@ -45,8 +61,22 @@ router.get('/', auth, async (req, res) => {
 // @route   PUT api/subjects/:id
 // @desc    Cập nhật thông tin môn học
 // @access  Private (Admin)
-router.put('/:id', [auth, admin], async (req, res) => {
-    const { subjectName, credits, schools } = req.body;
+router.put('/:id', [
+    auth,
+    admin,
+    body('subjectName', 'Tên môn học là bắt buộc').not().isEmpty(),
+    body('credits', 'Số tín chỉ là bắt buộc và phải là số').isInt({ min: 0 }),
+    body('schools', 'Vui lòng chọn ít nhất một trường').isArray({ min: 1 }),
+    body('major', 'Ngành là bắt buộc').not().isEmpty(),
+    body('yearLevel', 'Năm học là bắt buộc và phải là số').isInt({ min: 1, max: 5 }),
+    body('category', 'Loại môn học là bắt buộc').isIn(['required', 'elective', 'general'])
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { subjectName, credits, schools, major, yearLevel, category } = req.body;
     try {
         if (!schools || schools.length === 0) {
             return res.status(400).json({ msg: 'Vui lòng chọn ít nhất một trường' });
@@ -58,6 +88,9 @@ router.put('/:id', [auth, admin], async (req, res) => {
         subject.subjectName = subjectName;
         subject.credits = credits;
         subject.schools = schools;
+        subject.major = major;
+        subject.yearLevel = yearLevel;
+        subject.category = category;
 
         await subject.save();
         await subject.populate('schools', 'schoolCode schoolName');

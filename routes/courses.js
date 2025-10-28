@@ -61,9 +61,9 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const course = await Course.findById(req.params.id)
-            .populate('subject', 'subjectCode subjectName credits')
+            .populate('subject', 'subjectCode subjectName credits major yearLevel category') // Thêm major, yearLevel, category
             .populate('teacher', 'firstName lastName email')
-            .populate('semester', 'name code academicYear');
+            .populate('semester', 'name code academicYear semesterNumber'); // Thêm semesterNumber
 
         if (!course) {
             return res.status(404).json({ message: 'Course not found' });
