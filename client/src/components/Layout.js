@@ -38,14 +38,14 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
           name: 'Quản trị',
           icon: Settings,
           items: [
-            { name: 'Người dùng', href: '/admin/users', icon: Users },
-            { name: 'Giảng viên', href: '/admin/teachers', icon: GraduationCap },
-            { name: 'Môn học', href: '/admin/subjects', icon: BookCopy },
-            { name: 'Lớp học phần', href: '/admin/courses', icon: BookOpen },
-            { name: 'Học kỳ', href: '/admin/semesters', icon: Calendar },
-            { name: 'Phòng học', href: '/admin/classrooms', icon: DoorOpen },
-            { name: 'Trường/Khoa', href: '/admin/schools', icon: Building },
-            { name: 'Đăng ký', href: '/admin/registrations', icon: ClipboardList },
+            { name: 'Người dùng', href: '/admin/users', icon: Users }, // 1
+            { name: 'Giảng viên', href: '/admin/teachers', icon: GraduationCap }, // 2
+            { name: 'Học kỳ', href: '/admin/semesters', icon: Calendar }, // 3
+            { name: 'Trường/Khoa', href: '/admin/schools', icon: Building }, // 4
+            { name: 'Phòng học', href: '/admin/classrooms', icon: DoorOpen }, // 5
+            { name: 'Môn học', href: '/admin/subjects', icon: BookCopy }, // 6
+            { name: 'Lớp học phần', href: '/admin/courses', icon: BookOpen }, // 7
+            { name: 'Đăng ký', href: '/admin/registrations', icon: ClipboardList }, // 8
           ]
         }
       };

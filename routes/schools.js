@@ -5,6 +5,7 @@ const School = require('../models/School');
 const Subject = require('../models/Subject'); // Import Subject model
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
+const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 
 // @route   POST api/schools
 // @desc    Tạo trường mới
@@ -75,7 +76,7 @@ router.put('/:id', [auth, admin], async (req, res) => {
 // @route   DELETE api/schools/:id
 // @desc    Xóa trường
 // @access  Private (Admin)
-router.delete('/:id', [auth, admin], async (req, res) => {
+router.delete('/:id', [auth, admin, verifyAdminPassword], async (req, res) => {
     try {
         let school = await School.findById(req.params.id);
         if (!school) return res.status(404).json({ msg: 'Không tìm thấy trường' });
@@ -88,6 +89,30 @@ router.delete('/:id', [auth, admin], async (req, res) => {
 
         await School.findByIdAndDelete(req.params.id);
         res.json({ msg: 'Đã xóa trường thành công' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Lỗi Server');
+    }
+});
+
+// @route   DELETE api/schools
+// @desc    Xóa nhiều trường cùng lúc
+// @access  Private (Admin)
+router.delete('/', [auth, admin, verifyAdminPassword], async (req, res) => {
+    const { schoolIds } = req.body;
+
+    if (!schoolIds || !Array.isArray(schoolIds) || schoolIds.length === 0) {
+        return res.status(400).json({ msg: 'Vui lòng cung cấp danh sách ID trường cần xóa.' });
+    }
+
+    try {
+        // Kiểm tra xem có trường nào trong danh sách đang được sử dụng không
+        const subjectCount = await Subject.countDocuments({ schools: { $in: schoolIds } });
+        if (subjectCount > 0) {
+            return res.status(400).json({ msg: 'Không thể xóa. Tồn tại trường đang được sử dụng trong các môn học.' });
+        }
+        const result = await School.deleteMany({ _id: { $in: schoolIds } });
+        res.json({ msg: `Đã xóa thành công ${result.deletedCount} trường.` });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Lỗi Server');

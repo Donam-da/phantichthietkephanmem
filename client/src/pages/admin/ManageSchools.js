@@ -1,10 +1,11 @@
 // client/src/pages/admin/ManageSchools.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 // Giả định bạn có một file api service, nếu không có thể dùng axios trực tiếp
 // import api from '../../services/api'; 
 import axios from 'axios';
+import ConfirmPasswordModal from '../../components/ConfirmPasswordModal';
 
 
 const ManageSchools = () => {
@@ -13,6 +14,11 @@ const ManageSchools = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentSchool, setCurrentSchool] = useState(null);
     const [formData, setFormData] = useState({ schoolCode: '', schoolName: '' });
+    // State cho xóa hàng loạt và xác nhận mật khẩu
+    const [selectedSchools, setSelectedSchools] = useState([]);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     // Hàm để lấy token từ localStorage
     const getAuthHeaders = () => {
@@ -86,19 +92,64 @@ const ManageSchools = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa trường này?')) {
-            const toastId = toast.loading('Đang xóa...');
-            try {
-                await axios.delete(`/api/schools/${id}`, getAuthHeaders());
-                toast.success('Xóa thành công!', { id: toastId });
-                closeModal(); // Đóng modal sau khi xóa
-                fetchSchools();
-            } catch (error) {
-                toast.error('Xóa thất bại.', { id: toastId });
-            }
+    const handleDelete = (id) => {
+        setConfirmAction(() => (password) => executeDelete(id, password));
+        setIsConfirmModalOpen(true);
+    };
+
+    const executeDelete = async (id, password) => {
+        setIsConfirming(true);
+        const toastId = toast.loading('Đang xóa...');
+        try {
+            await axios.delete(`/api/schools/${id}`, { ...getAuthHeaders(), data: { password } });
+            toast.success('Xóa thành công!', { id: toastId });
+            closeModal();
+            fetchSchools();
+        } catch (error) {
+            const errorMsg = error.response?.data?.msg || 'Xóa thất bại.';
+            toast.error(errorMsg, { id: toastId });
+        } finally {
+            setIsConfirming(false);
+            setIsConfirmModalOpen(false);
         }
     };
+
+    // --- LOGIC XÓA HÀNG LOẠT ---
+    const handleSelectSchool = (id) => {
+        setSelectedSchools(prev => prev.includes(id) ? prev.filter(schoolId => schoolId !== id) : [...prev, id]);
+    };
+
+    const handleSelectAll = (e) => {
+        setSelectedSchools(e.target.checked ? schools.map(s => s._id) : []);
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedSchools.length === 0) return;
+        setConfirmAction(() => (password) => executeDeleteSelected(password));
+        setIsConfirmModalOpen(true);
+    };
+
+    const executeDeleteSelected = async (password) => {
+        setIsConfirming(true);
+        const toastId = toast.loading('Đang xóa...');
+        try {
+            await axios.delete('/api/schools', {
+                ...getAuthHeaders(),
+                data: { schoolIds: selectedSchools, password }
+            });
+            toast.success(`Đã xóa ${selectedSchools.length} trường!`, { id: toastId });
+            setSelectedSchools([]);
+            fetchSchools();
+        } catch (error) {
+            const errorMsg = error.response?.data?.msg || 'Xóa thất bại.';
+            toast.error(errorMsg, { id: toastId });
+        } finally {
+            setIsConfirming(false);
+            setIsConfirmModalOpen(false);
+        }
+    };
+
+    const isAllSelected = schools.length > 0 && selectedSchools.length === schools.length;
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
@@ -107,12 +158,24 @@ const ManageSchools = () => {
                     <h1 className="text-3xl font-bold text-gray-900">Quản lý Trường học</h1>
                     <p className="mt-1 text-sm text-gray-600">Thêm, sửa, và quản lý các trường/khoa trong hệ thống.</p>
                 </div>
-                <button 
-                    onClick={() => openModal()} 
-                    className="mt-4 sm:mt-0 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
-                >
-                    Thêm Trường mới
-                </button>
+                <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                    {selectedSchools.length > 0 && (
+                        <button
+                            onClick={handleDeleteSelected}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all"
+                        >
+                            <Trash2 className="h-5 w-5" />
+                            Xóa ({selectedSchools.length})
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => openModal()} 
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                    >
+                        <Plus className="h-5 w-5" />
+                        Thêm Trường mới
+                    </button>
+                </div>
             </div>
 
             {isLoading ? (
@@ -124,18 +187,21 @@ const ManageSchools = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
+                                <th className="px-6 py-3 text-left">
+                                    <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã Trường</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Trường</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {schools.map((school) => (
-                                <tr key={school._id} onClick={() => openModal(school)} className="hover:bg-gray-50 cursor-pointer">
+                                <tr key={school._id} onDoubleClick={() => openModal(school)} className={`hover:bg-gray-50 cursor-pointer ${selectedSchools.includes(school._id) ? 'bg-blue-50' : ''}`}>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" checked={selectedSchools.includes(school._id)} onChange={() => handleSelectSchool(school._id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{school.schoolCode}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{school.schoolName}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <Edit className="h-5 w-5 text-gray-400" />
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -197,6 +263,15 @@ const ManageSchools = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmPasswordModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={confirmAction}
+                title="Xác nhận hành động xóa"
+                message="Hành động này không thể hoàn tác. Vui lòng nhập mật khẩu của bạn để xác nhận."
+                isLoading={isConfirming}
+            />
         </div>
     );
 };

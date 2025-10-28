@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, X, Clock, ArrowRight } from 'lucide-react';
+import { Trash2, X, Clock, ArrowRight, Upload, Plus, Edit } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import ConfirmPasswordModal from '../../components/ConfirmPasswordModal';
 
 // Moved outside component to prevent re-declaration on every render
 const roomTypeNames = {
@@ -29,6 +30,17 @@ const ManageClassrooms = () => {
         notes: '',
         scheduledEvents: [], // Thay thế các trường thời gian cũ bằng một mảng
     });
+    // State cho chức năng import
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importResults, setImportResults] = useState(null);
+    // State cho xóa hàng loạt
+    const [selectedClassrooms, setSelectedClassrooms] = useState([]);
+    // State cho modal xác nhận mật khẩu
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
+    const [isConfirming, setIsConfirming] = useState(false);
+
 
     const fetchClassrooms = useCallback(async () => {
         setIsLoading(true);
@@ -148,6 +160,81 @@ const ManageClassrooms = () => {
         }
     };
 
+    // --- LOGIC XÓA HÀNG LOẠT ---
+    const handleSelectClassroom = (id) => {
+        setSelectedClassrooms(prev => prev.includes(id) ? prev.filter(classroomId => classroomId !== id) : [...prev, id]);
+    };
+
+    const handleSelectAll = (e) => {
+        setSelectedClassrooms(e.target.checked ? classrooms.map(c => c._id) : []);
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedClassrooms.length === 0) return;
+        setConfirmAction(() => (password) => executeDeleteSelected(password));
+        setIsConfirmModalOpen(true);
+    };
+
+    const executeDeleteSelected = async (password) => {
+        setIsConfirming(true);
+        const toastId = toast.loading('Đang xóa...');
+        try {
+            await axios.delete('/api/classrooms', {
+                ...getAuthHeaders(),
+                data: { classroomIds: selectedClassrooms, password }
+            });
+            toast.success('Xóa thành công!', { id: toastId });
+            setSelectedClassrooms([]);
+            fetchClassrooms();
+        } catch (error) {
+            const errorMsg = error.response?.data?.msg || 'Xóa thất bại.';
+            toast.error(errorMsg, { id: toastId });
+        } finally {
+            setIsConfirming(false);
+            setIsConfirmModalOpen(false);
+        }
+    };
+
+    const isAllSelected = classrooms.length > 0 && selectedClassrooms.length === classrooms.length;
+
+    // --- LOGIC CHO CHỨC NĂNG IMPORT ---
+    const openImportModal = () => {
+        setIsImportModalOpen(true);
+        setImportFile(null);
+        setImportResults(null);
+    };
+
+    const closeImportModal = () => {
+        setIsImportModalOpen(false);
+    };
+
+    const handleImportFileChange = (e) => {
+        setImportFile(e.target.files[0]);
+    };
+
+    const handleImportSubmit = async (e) => {
+        e.preventDefault();
+        if (!importFile) {
+            toast.error('Vui lòng chọn một tệp để nhập.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', importFile);
+
+        const toastId = toast.loading('Đang nhập dữ liệu phòng học...');
+        try {
+            const res = await axios.post('/api/classrooms/import', formData, {
+                headers: { ...getAuthHeaders().headers, 'Content-Type': 'multipart/form-data' }
+            });
+            toast.success(res.data.msg, { id: toastId });
+            setImportResults(res.data);
+            fetchClassrooms(); // Tải lại danh sách
+        } catch (error) {
+            toast.error(error.response?.data?.msg || 'Lỗi khi nhập dữ liệu.', { id: toastId });
+            setImportResults(error.response?.data || { failedCount: 1, errors: [{ msg: 'Lỗi không xác định.' }] });
+        }
+    };
     // --- Các hàm quản lý sự kiện hẹn giờ ---
     const addScheduledEvent = () => {
         const formatForInput = (date) => {
@@ -201,12 +288,31 @@ const ManageClassrooms = () => {
                     <h1 className="text-3xl font-bold text-gray-900">Quản lý Phòng học</h1>
                     <p className="mt-1 text-sm text-gray-600">Thêm, sửa, và quản lý các phòng học và lịch khóa phòng.</p>
                 </div>
-                <button 
-                    onClick={() => openModal()} 
-                    className="mt-4 sm:mt-0 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
-                >
-                    Thêm Phòng học
-                </button>
+                <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                    {selectedClassrooms.length > 0 && (
+                        <button
+                            onClick={handleDeleteSelected}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all"
+                        >
+                            <Trash2 className="h-5 w-5" />
+                            Xóa ({selectedClassrooms.length})
+                        </button>
+                    )}
+                    <button
+                        onClick={openImportModal}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all"
+                    >
+                        <Upload className="h-5 w-5" />
+                        Nhập từ CSV
+                    </button>
+                    <button 
+                        onClick={() => openModal()} 
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                    >
+                        <Plus className="h-5 w-5" />
+                        Thêm Phòng học
+                    </button>
+                </div>
             </div>
 
             {isLoading ? (
@@ -215,21 +321,30 @@ const ManageClassrooms = () => {
                 </div>
             ) : (
                 <div className="bg-white shadow-md rounded-xl overflow-hidden">
-                    <ul className="divide-y divide-gray-200">
-                        {classrooms.map((room) => (
-                            <li
-                                key={room._id}
-                                className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 cursor-pointer"
-                                onDoubleClick={() => openModal(room)}
-                            >
-                                <div>
-                                    <p className="text-sm font-medium text-indigo-600">{room.roomCode}</p>
-                                    <p className="text-sm text-gray-500">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left">
+                                    <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã phòng</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thông tin</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lịch khóa phòng</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {classrooms.map((room) => (
+                                <tr key={room._id} onDoubleClick={() => openModal(room)} className={`hover:bg-gray-50 cursor-pointer ${selectedClassrooms.includes(room._id) ? 'bg-blue-50' : ''}`}>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" checked={selectedClassrooms.includes(room._id)} onChange={() => handleSelectClassroom(room._id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">{room.roomCode}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         Loại: {roomTypeNames[room.roomType] || room.roomType} - Sức chứa: {room.capacity}
-                                    </p>
-                                    {room.scheduledEvents && room.scheduledEvents.length > 0 && (
-                                        <div className="mt-2 space-y-1">
-                                            <p className="text-xs font-semibold text-gray-500">Lịch khóa phòng:</p>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {room.scheduledEvents && room.scheduledEvents.length > 0 ? (
                                             <ul className="list-none pl-0 space-y-1">
                                                 {room.scheduledEvents.map((event, index) => (
                                                     <li key={index} className="flex items-center text-xs">
@@ -238,26 +353,17 @@ const ManageClassrooms = () => {
                                                     </li>
                                                 ))}
                                             </ul>
-                                        </div>
-                                    )}
-                                    {!room.isActive && room.notes && (
-                                        <p className="text-xs text-red-500 mt-1">Lý do khóa: {room.notes}</p>
-                                    )}
-                                    {room.isActive && room.notes && (
-                                        <p className="text-xs mt-1">
-                                            <span className="text-amber-700">Hành động trước đó: </span><span className="text-gray-500">{room.notes}</span>
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${room.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`} onClick={(e) => e.stopPropagation()}>
-                                        {room.isActive ? 'Hoạt động' : 'Không hoạt động'}
-                                    </span>
-                                    {/* Chức năng xóa đã được chuyển vào form chỉnh sửa */}
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
+                                        ) : 'Không có'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${room.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {room.isActive ? 'Hoạt động' : 'Không hoạt động'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
@@ -380,6 +486,65 @@ const ManageClassrooms = () => {
                     </div>
                 </div>
             )}
+
+            {isImportModalOpen && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div className="relative top-20 mx-auto p-6 border w-full max-w-md shadow-lg rounded-xl bg-white">
+                        <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+                            Nhập Phòng học từ tệp CSV
+                        </h3>
+                        <form onSubmit={handleImportSubmit}>
+                            <div className="mb-4">
+                                <label htmlFor="importFile" className="block text-sm font-medium text-gray-700">Chọn tệp CSV</label>
+                                <input
+                                    type="file"
+                                    id="importFile"
+                                    name="importFile"
+                                    accept=".csv"
+                                    onChange={handleImportFileChange}
+                                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    required
+                                />
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Tệp phải có 5 cột: `Tòa`, `Tầng`, `Phòng`, `Loại phòng`, `Sức chứa`.
+                                </p>
+                            </div>
+
+                            {importResults && (
+                                <div className="mt-4 p-3 bg-gray-50 rounded-md border">
+                                    <p className="text-sm font-medium text-gray-800">Kết quả nhập:</p>
+                                    <p className="text-sm text-gray-700">Tổng số dòng đã xử lý: {importResults.processedCount}</p>
+                                    <p className="text-sm text-green-600">Thêm thành công: {importResults.importedCount}</p>
+                                    {importResults.failedCount > 0 && (
+                                        <div className="text-sm text-red-600">
+                                            Thất bại: {importResults.failedCount}
+                                            <ul className="list-disc list-inside mt-2 text-xs">
+                                                {importResults.errors.map((err, index) => (
+                                                    <li key={index}>Mã phòng '{err.row.roomCode || 'không xác định'}': {err.msg}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex justify-end space-x-3 mt-6">
+                                <button type="button" onClick={closeImportModal} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all">Đóng</button>
+                                <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">Tải lên và Nhập</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            <ConfirmPasswordModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={confirmAction}
+                title="Xác nhận hành động xóa"
+                message="Hành động này không thể hoàn tác. Vui lòng nhập mật khẩu của bạn để xác nhận."
+                isLoading={isConfirming}
+            />
         </div>
     );
 };
