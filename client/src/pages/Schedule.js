@@ -223,10 +223,11 @@ const Schedule = () => {
                         <table className="min-w-full border-collapse table-fixed">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%] border-b border-gray-200">Ca học</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px] border-b border-gray-200">Ca học</th>
                                     {displayDays.map(day => (
-                                        <th key={day.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            {day.name} <br/> <span className="font-normal normal-case text-gray-600">({day.dateString})</span>
+                                        <th key={day.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[160px]">
+                                            <div>{day.name}</div>
+                                            <div className="font-normal normal-case text-gray-600">({day.dateString})</div>
                                         </th>
                                     ))}
                                 </tr>
@@ -250,7 +251,7 @@ const Schedule = () => {
                                                 day.dateObject <= new Date(new Date(currentSemester.endDate).setHours(23, 59, 59, 999));
 
                                             return (
-                                                <td key={key} className="px-2 py-2 align-top text-xs border-r border-gray-200">
+                                                <td key={key} className="px-2 py-2 align-top text-xs border-r border-gray-200 min-w-[160px]">
                                                     {isWithinSemester && slots.length > 0 ? ( // Giữ lại dòng này
                                                         <div className="space-y-2">
                                                             {slots.map((slot, index) => (
