@@ -9,6 +9,7 @@ import Courses from './pages/Courses';
 import CourseDetail from './pages/CourseDetail';
 import MyRegistrations from './pages/MyRegistrations';
 import Profile from './pages/Profile';
+import Schedule from './pages/Schedule'; // Import trang thời khóa biểu
 import AdminDashboard from './pages/AdminDashboard';
 import UserManagement from './pages/UserManagement';
 import CourseManagement from './pages/CourseManagement';
@@ -71,6 +72,7 @@ const AppRoutes = () => {
         <Route path="courses" element={<Courses />} />
         <Route path="courses/:id" element={<CourseDetail />} />
         <Route path="my-registrations" element={<MyRegistrations />} />
+        <Route path="schedule" element={<Schedule />} />
         <Route path="profile" element={<Profile />} />
         
         {/* Teacher Routes */}
