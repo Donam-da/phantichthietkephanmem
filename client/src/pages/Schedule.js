@@ -219,24 +219,6 @@ const Schedule = () => {
                     </p>
                 </div>
 
-                {/* Week Navigation */}
-                <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm">
-                    <button onClick={() => changeWeek(-1)} className="p-2 rounded-full hover:bg-gray-100">
-                        <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <div className="text-center">
-                        <p className="font-semibold text-gray-800">
-                            Tuần từ {displayDays.length > 0 ? displayDays[0].dateString : ''} - {displayDays.length > 0 ? displayDays[5].dateString : ''}
-                        </p>
-                    </div>
-                    <button onClick={() => changeWeek(1)} className="p-2 rounded-full hover:bg-gray-100">
-                        <ChevronRight className="h-5 w-5" />
-                    </button>
-                    <button onClick={() => setCurrentWeekStart(new Date())} className="ml-4 inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                        <CalendarIcon size={14} className="mr-1.5" /> Tuần này
-                    </button>
-                </div>
-
                 <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
