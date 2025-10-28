@@ -64,6 +64,11 @@ Một ứng dụng web hiện đại giúp quản lý quy trình đăng ký họ
 git clone [URL_REPOSITORY_CỦA_BẠN]
 cd phantichthietkephanmem
 
+# Xóa dữ liệu cũ và seed tài khoản mặc định cho admin
+npm run seed  
+#hoặc 
+node scripts/clearAndSeedAdmin.js
+
 # Cài đặt dependencies cho Backend
 npm install
 
