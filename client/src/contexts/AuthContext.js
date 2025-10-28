@@ -84,13 +84,14 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await api.put('/api/users/profile', profileData);
+      // Sửa endpoint từ '/profile' thành '/me' để khớp với API route
+      const response = await api.put('/api/users/me', profileData);
       setUser(response.data);
-      return { success: true };
+      return { success: true, user: response.data };
     } catch (error) {
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Cập nhật thất bại' 
+        message: error.response?.data?.message || 'Cập nhật thất bại'
       };
     }
   };

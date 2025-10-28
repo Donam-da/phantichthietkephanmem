@@ -36,7 +36,7 @@ const Header = () => {
     };
 
     return (
-        <header className="bg-white shadow-sm">
+        <header className="bg-transparent w-full">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-end items-center h-16">
                     <div className="flex items-center space-x-4">
@@ -59,7 +59,7 @@ const Header = () => {
                                     src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=random`}
                                     alt="User avatar"
                                 />
-                                <span>{user?.firstName} {user?.lastName}</span>
+                                <span>{user?.firstName} {user?.lastName === '.' ? '' : user?.lastName}</span>
                                 <ChevronDown className={`h-4 w-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 

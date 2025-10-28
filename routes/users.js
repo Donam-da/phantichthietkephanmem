@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Course = require('../models/Course'); // Import Course model
+const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
 
@@ -76,41 +77,97 @@ router.get('/', [auth, admin], async (req, res) => {
     }
 });
 
-// @route   GET api/users/students/:id
-// @desc    Lấy chi tiết sinh viên
-// @access  Private (Admin)
-router.get('/students/:id', [auth, admin], async (req, res) => {
+// @route   GET api/users/me
+// @desc    Lấy thông tin người dùng hiện tại
+// @access  Private
+router.get('/me', auth, async (req, res) => {
     try {
-        const student = await User.findById(req.params.id).populate('school', 'schoolName').select('-password');
-        if (!student || student.role !== 'student') {
-            return res.status(404).json({ message: 'Không tìm thấy sinh viên' });
+        // req.user.id được thiết lập bởi middleware 'auth'
+        const user = await User.findById(req.user.id).select('-password').populate('school', 'schoolName');
+        if (!user) {
+            return res.status(404).json({ msg: 'Không tìm thấy người dùng.' });
         }
-        res.json(student);
+        res.json(user);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Lỗi Server');
     }
 });
 
+// @route   PUT api/users/me
+// @desc    Người dùng tự cập nhật thông tin cá nhân
+// @access  Private
+router.put('/me', [
+    auth,
+    body('email', 'Vui lòng nhập email hợp lệ').optional().isEmail(),
+    body('firstName', 'Họ là bắt buộc').optional().not().isEmpty(),
+    body('lastName', 'Tên là bắt buộc').optional().not().isEmpty(),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ msg: 'Không tìm thấy người dùng' });
+        }
+
+        // Chỉ cập nhật các trường được phép
+        const allowedUpdates = ['firstName', 'lastName', 'email', 'phone', 'address', 'dateOfBirth', 'gender', 'avatar', 'year', 'semester'];
+        Object.keys(req.body).forEach(key => {
+            if (allowedUpdates.includes(key)) {
+                user[key] = req.body[key];
+            }
+        });
+
+        const updatedUser = await user.save();
+        res.json(updatedUser.toJSON());
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Lỗi Server');
+    }
+});
+
+// @route   GET api/users/:id
+// @desc    Lấy chi tiết người dùng theo ID
+// @access  Private (Admin)
+router.get('/:id', [auth, admin], async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).populate('school', 'schoolName').select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+        }
+        res.json(user);
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+        }
+        res.status(500).send('Lỗi Server');
+    }
+});
 
 // @route   PUT api/users/:id
 // @desc    Cập nhật thông tin người dùng (bao gồm cả việc kích hoạt/vô hiệu hóa)
 // @access  Private (Admin)
-router.put('/:id', [auth, admin], async (req, res) => {
-    const { isActive } = req.body;
-
+router.put('/:id', [
+    auth, 
+    admin,
+    // Thêm validation cho các trường có thể được cập nhật
+    body('email', 'Vui lòng nhập email hợp lệ').optional().isEmail(),
+    body('firstName', 'Họ là bắt buộc').optional().not().isEmpty(),
+    body('lastName', 'Tên là bắt buộc').optional().not().isEmpty(),
+], async (req, res) => {
     try {
         const userToUpdate = await User.findById(req.params.id);
 
         if (!userToUpdate) {
             return res.status(404).json({ msg: 'Không tìm thấy người dùng' });
         }
-
-        // Chỉ cập nhật các trường được gửi lên
-        if (typeof isActive !== 'undefined') {
-            userToUpdate.isActive = isActive;
-        }
-
+        
+        const { firstName, lastName, email, isActive } = req.body;
         // --- LOGIC MỚI: Xử lý khi vô hiệu hóa một giảng viên ---
         // Nếu người dùng bị vô hiệu hóa (isActive: false) và là một giảng viên
         if (isActive === false && userToUpdate.role === 'teacher') {
@@ -140,6 +197,15 @@ router.put('/:id', [auth, admin], async (req, res) => {
         }
         // --- KẾT THÚC LOGIC MỚI ---
 
+        // Cập nhật các trường thông tin khác nếu chúng được cung cấp
+        if (firstName) userToUpdate.firstName = firstName;
+        if (lastName) userToUpdate.lastName = lastName;
+        if (email && userToUpdate.email !== email) {
+            // Có thể thêm logic kiểm tra email trùng lặp ở đây nếu cần
+            userToUpdate.email = email;
+        }
+        if (typeof isActive !== 'undefined') userToUpdate.isActive = isActive;
+
         await userToUpdate.save();
 
         res.json({ msg: 'Cập nhật người dùng thành công', user: userToUpdate });
@@ -150,10 +216,44 @@ router.put('/:id', [auth, admin], async (req, res) => {
     }
 });
 
+// @route   DELETE api/users
+// @desc    Xóa nhiều người dùng cùng lúc
+// @access  Private (Admin)
+router.delete('/', [auth, admin, verifyAdminPassword], async (req, res) => {
+    const { userIds } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({ msg: 'Vui lòng cung cấp danh sách ID người dùng cần xóa.' });
+    }
+
+    try {
+        // Tìm các giảng viên trong danh sách cần xóa để xử lý các lớp học phần liên quan
+        const teachersToDelete = await User.find({ _id: { $in: userIds }, role: 'teacher' });
+        const teacherIdsToDelete = teachersToDelete.map(t => t._id);
+
+        if (teacherIdsToDelete.length > 0) {
+            await Course.updateMany(
+                { teacher: { $in: teacherIdsToDelete } },
+                {
+                    $set: { isActive: false, notes: "Lớp tạm khóa do giảng viên đã bị xóa." },
+                    $unset: { teacher: "" }
+                }
+            );
+            console.log(`Đã cập nhật các lớp học phần của ${teacherIdsToDelete.length} giảng viên sắp bị xóa.`);
+        }
+
+        const result = await User.deleteMany({ _id: { $in: userIds } });
+        res.json({ msg: `Đã xóa thành công ${result.deletedCount} người dùng.` });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Lỗi Server');
+    }
+});
+
 // @route   DELETE api/users/:id
 // @desc    Xóa người dùng (hard delete - không khuyến khích)
 // @access  Private (Admin)
-router.delete('/:id', [auth, admin], async (req, res) => {
+router.delete('/:id', [auth, admin, verifyAdminPassword], async (req, res) => {
     try {
         const userToDelete = await User.findById(req.params.id);
         if (!userToDelete) {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import ConfirmPasswordModal from '../../components/ConfirmPasswordModal';
 
 const ManageSubjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -15,6 +16,10 @@ const ManageSubjects = () => {
         credits: '',
         schools: [],
     });
+    // State cho modal xác nhận mật khẩu
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     const getAuthHeaders = () => ({ headers: { 'x-auth-token': localStorage.getItem('token') } });
 
@@ -93,17 +98,64 @@ const ManageSubjects = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa môn học này?')) {
-            const toastId = toast.loading('Đang xóa...');
-            try {
-                await axios.delete(`/api/subjects/${id}`, getAuthHeaders());
-                toast.success('Xóa thành công!', { id: toastId });
-                closeModal(); // Đóng modal sau khi xóa
-                fetchData();
-            } catch (error) {
-                toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
-            }
+    // --- LOGIC MỚI: Xử lý chọn và xóa hàng loạt ---
+    const [selectedSubjects, setSelectedSubjects] = useState([]);
+
+    const handleSelectSubject = (id) => {
+        setSelectedSubjects(prev => prev.includes(id) ? prev.filter(subjectId => subjectId !== id) : [...prev, id]);
+    };
+
+    const handleSelectAll = (e) => {
+        setSelectedSubjects(e.target.checked ? subjects.map(s => s._id) : []);
+    };
+
+    const handleDeleteSelected = () => {
+        const count = selectedSubjects.length;
+        if (count === 0) return;
+        setConfirmAction(() => (password) => executeDeleteSelected(password));
+        setIsConfirmModalOpen(true);
+    };
+
+    const executeDeleteSelected = async (password) => {
+        setIsConfirming(true);
+        const toastId = toast.loading('Đang xóa...');
+        try {
+            await axios.delete('/api/subjects', {
+                ...getAuthHeaders(),
+                data: { subjectIds: selectedSubjects, password }
+            });
+            toast.success('Xóa thành công!', { id: toastId });
+            setSelectedSubjects([]);
+            fetchData();
+        } catch (error) {
+            toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+        } finally {
+            setIsConfirming(false);
+            setIsConfirmModalOpen(false);
+        }
+    };
+
+    const isAllSelected = subjects.length > 0 && selectedSubjects.length === subjects.length;
+    // --- KẾT THÚC LOGIC MỚI ---
+
+    const handleDelete = (id) => {
+        setConfirmAction(() => (password) => executeDelete(id, password));
+        setIsConfirmModalOpen(true);
+    };
+
+    const executeDelete = async (id, password) => {
+        setIsConfirming(true);
+        const toastId = toast.loading('Đang xóa...');
+        try {
+            await axios.delete(`/api/subjects/${id}`, { ...getAuthHeaders(), data: { password } });
+            toast.success('Xóa thành công!', { id: toastId });
+            closeModal();
+            fetchData();
+        } catch (error) {
+            toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+        } finally {
+            setIsConfirming(false);
+            setIsConfirmModalOpen(false);
         }
     };
 
@@ -114,12 +166,24 @@ const ManageSubjects = () => {
                     <h1 className="text-3xl font-bold text-gray-900">Quản lý Môn học</h1>
                     <p className="mt-1 text-sm text-gray-600">Thêm, sửa, và quản lý các môn học trong chương trình đào tạo.</p>
                 </div>
-                <button 
-                    onClick={() => openModal()} 
-                    className="mt-4 sm:mt-0 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
-                >
-                    Thêm Môn học
-                </button>
+                <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                    {selectedSubjects.length > 0 && (
+                        <button
+                            onClick={handleDeleteSelected}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all"
+                        >
+                            <Trash2 className="h-5 w-5" />
+                            Xóa ({selectedSubjects.length})
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => openModal()} 
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                    >
+                        <BookOpen className="h-5 w-5" />
+                        Thêm Môn học
+                    </button>
+                </div>
             </div>
 
             {isLoading ? (
@@ -131,18 +195,29 @@ const ManageSubjects = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã Môn</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Môn học</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số TC</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Các trường</th>
+                                <th className="px-6 py-3 text-left">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        onChange={handleSelectAll}
+                                        checked={isAllSelected}
+                                    />
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Mã Môn</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Tên Môn học</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Số TC</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Các trường</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {subjects.map((subject) => (
-                                <tr key={subject._id} onDoubleClick={() => openModal(subject)} className="hover:bg-gray-50 cursor-pointer">
+                                <tr key={subject._id} onDoubleClick={() => openModal(subject)} className={`hover:bg-gray-50 cursor-pointer ${selectedSubjects.includes(subject._id) ? 'bg-blue-50' : ''}`}>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked={selectedSubjects.includes(subject._id)} onChange={() => handleSelectSubject(subject._id)} onClick={(e) => e.stopPropagation()} />
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{subject.subjectCode}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{subject.subjectName}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{subject.credits}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">{subject.credits}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                         {subject.schools.map(s => s.schoolCode).join(', ')}
                                     </td>
@@ -212,6 +287,15 @@ const ManageSubjects = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmPasswordModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={confirmAction}
+                title="Xác nhận hành động xóa"
+                message="Hành động này không thể hoàn tác. Vui lòng nhập mật khẩu của bạn để xác nhận."
+                isLoading={isConfirming}
+            />
         </div>
     );
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator'); // Thêm dòng này
 const Subject = require('../models/Subject');
 const { auth } = require('../middleware/auth');
+const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 const { admin } = require('../middleware/admin');
 
 // @route   POST api/subjects
@@ -102,17 +103,39 @@ router.put('/:id', [
 });
 
 // @route   DELETE api/subjects/:id
-// @desc    Xóa môn học
+// @desc    Xóa một môn học
 // @access  Private (Admin)
-router.delete('/:id', [auth, admin], async (req, res) => {
+// Thêm middleware verifyAdminPassword
+router.delete('/:id', [auth, admin, verifyAdminPassword], async (req, res) => {
     try {
         const subject = await Subject.findById(req.params.id);
         if (!subject) return res.status(404).json({ msg: 'Không tìm thấy môn học' });
 
         // TODO: Kiểm tra xem môn học có đang được sử dụng trong khóa học không trước khi xóa
+        // Hiện tại, chúng ta sẽ cho phép xóa. Nếu có khóa học liên quan, cần xử lý logic đó.
 
         await Subject.findByIdAndDelete(req.params.id);
         res.json({ msg: 'Đã xóa môn học thành công' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Lỗi Server');
+    }
+});
+
+// @route   DELETE api/subjects
+// @desc    Xóa nhiều môn học cùng lúc
+// @access  Private (Admin)
+// Thêm middleware verifyAdminPassword
+router.delete('/', [auth, admin, verifyAdminPassword], async (req, res) => {
+    const { subjectIds } = req.body;
+
+    if (!subjectIds || !Array.isArray(subjectIds) || subjectIds.length === 0) {
+        return res.status(400).json({ msg: 'Vui lòng cung cấp danh sách ID môn học cần xóa.' });
+    }
+
+    try {
+        const result = await Subject.deleteMany({ _id: { $in: subjectIds } });
+        res.json({ msg: `Đã xóa thành công ${result.deletedCount} môn học.` });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Lỗi Server');

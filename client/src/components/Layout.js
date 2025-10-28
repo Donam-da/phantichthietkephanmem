@@ -16,6 +16,7 @@ import {
   BookCopy, // Thêm icon cho Môn học
   LogOut,
   LayoutDashboard,
+  Pin, // Thêm icon Ghim
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -73,7 +74,8 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
 
   const navConfig = getNavigation();
   const { logout } = useAuth();
-  const [adminMenuOpen, setAdminMenuOpen] = useState(true); // State for collapsible admin menu
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false); // Trạng thái hover
+  const [isAdminMenuPinned, setIsAdminMenuPinned] = useState(false); // Trạng thái ghim
 
   const getLinkClass = (path) => {
     const baseClass = "group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-200";
@@ -99,17 +101,25 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
         ))}
 
         {navConfig.collapsible && ( // Use navConfig.collapsible here
-          <>
-            <button 
-              onClick={() => setAdminMenuOpen(!adminMenuOpen)}
-              className={`${getLinkClass('')} w-full flex items-center ${isAnyAdminMenuItemActive ? 'bg-blue-200 text-blue-800 font-semibold' : ''}`}
+          <div 
+            onMouseEnter={() => !isAdminMenuPinned && setAdminMenuOpen(true)} 
+            onMouseLeave={() => !isAdminMenuPinned && setAdminMenuOpen(false)}
+          >
+            <div 
+              className={`${getLinkClass('')} w-full flex items-center justify-between cursor-pointer ${isAnyAdminMenuItemActive ? 'bg-blue-200 text-blue-800 font-semibold' : ''}`}
             >
               <div className="flex items-center">
                 <navConfig.collapsible.icon className="mr-3 h-5 w-5" />
                 {navConfig.collapsible.name}
               </div>
-            </button>
-            {adminMenuOpen && (
+              <button 
+                onClick={() => setIsAdminMenuPinned(!isAdminMenuPinned)} 
+                className="p-1 rounded-full hover:bg-yellow-200 transition-colors"
+              >
+                <Pin size={16} className={`transition-transform ${isAdminMenuPinned ? 'rotate-45 text-yellow-500' : 'text-gray-500'}`} />
+              </button>
+            </div>
+            {(adminMenuOpen || isAdminMenuPinned) && (
               <div className="pl-5 space-y-1 mt-1">
                 {navConfig.collapsible.items.map((item) => (
                   <Link key={item.name} to={item.href} className={getLinkClass(item.href)} onClick={onLinkClick}>
@@ -119,7 +129,7 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
       </nav>
       <div className="px-3 py-4 border-t border-blue-200">
@@ -140,7 +150,45 @@ const Layout = () => {
   const { isAdmin, isTeacher } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // ====================================================================
+  // --- CẤU HÌNH HIỂN THỊ LOGO VÀ TIÊU ĐỀ TRONG SIDEBAR ---
+  // ====================================================================
+
+  // 1. Kích thước Logo
+  // Sử dụng giá trị pixel tùy ý để có kích thước chính xác. Ví dụ: 'h-[64px]'
+  // Các giá trị Tailwind cũ vẫn dùng được: 'h-12', 'h-14', 'h-16', 'h-20'
+  const logoHeightClass = 'h-[120px]';
+
+  // 2. Vị trí Logo (sử dụng Tailwind CSS classes)
+  // top-1/2 -translate-y-1/2 để căn giữa theo chiều dọc
+  // Để dùng giá trị tùy ý, sử dụng cú pháp: top-[46px] hoặc top-[2.875rem]
+  // Giá trị 46px sẽ nằm giữa top-11 (44px) và top-12 (48px).
+  // Bạn có thể thay đổi số 46 thành bất kỳ giá trị pixel nào bạn muốn.
+  const logoTop = 'top-[1px]';
+  const logoLeft = 'left-[2px]';
+  const logoRight = ''; // Để trống nếu muốn căn lề trái
+
+  // 3. Vị trí Chữ "Hệ thống" (sử dụng Tailwind CSS classes)
+  // top-1/2 -translate-y-1/2 để căn giữa theo chiều dọc
+  // left-24 để cách lề trái 96px (sau logo với khoảng cách hợp lý)
+  // Để dùng giá trị pixel tùy ý, sử dụng cú pháp: left-[96px]
+  const titleTop = 'top-1/2 -translate-y-1/2';
+  const titleLeft = 'left-[120px]';
+  const titleRight = ''; // Để trống nếu muốn căn lề trái
+
+  // ====================================================================
+  // --- KẾT THÚC CẤU HÌNH ---
+  // ====================================================================
+
   const userRole = isAdmin ? 'admin' : isTeacher ? 'teacher' : 'student';
+
+  // Xác định đường dẫn dashboard dựa trên vai trò người dùng
+  const getDashboardPath = (role) => {
+    if (role === 'admin') return '/admin';
+    if (role === 'teacher') return '/teacher/dashboard';
+    return '/dashboard';
+  };
+  const dashboardPath = getDashboardPath(userRole);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -148,13 +196,19 @@ const Layout = () => {
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-blue-50">
-          <div className="flex h-20 items-center justify-center px-4 border-b border-blue-200">
-            <img className="h-10 w-auto" src="/assets/images/logo.png" alt="Hệ thống Logo" />
-            <h1 className="text-2xl font-bold text-blue-800 ml-3">Hệ thống</h1>
-            <button onClick={() => setSidebarOpen(false)}>
-              <X className="h-6 w-6 text-gray-400" />
-            </button>
-          </div>
+          <Link to={dashboardPath} className="block">
+            <div className="relative h-20 px-4 border-b border-blue-200">
+              <img 
+                className={`absolute ${logoHeightClass} ${logoTop} ${logoLeft} ${logoRight} w-auto`} 
+                src="/assets/images/logo.png" 
+                alt="Hệ thống Logo" />
+              <h1 className={`absolute text-2xl font-bold text-blue-800 ${titleTop} ${titleLeft} ${titleRight}`}>Hệ thống</h1>
+              {/* Nút đóng sidebar (X) cũng được định vị tuyệt đối */}
+              <button onClick={(e) => { e.preventDefault(); setSidebarOpen(false); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200">
+                <X className="h-6 w-6 text-gray-400" />
+              </button>
+            </div>
+          </Link>
           <NavigationMenu userRole={userRole} onLinkClick={() => setSidebarOpen(false)} />
         </div>
       </div>
@@ -162,10 +216,15 @@ const Layout = () => {
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-blue-50 border-r border-gray-200">
-          <div className="flex items-center justify-center h-20 border-b border-blue-200">
-            <img className="h-10 w-auto" src="/assets/images/logo.png" alt="Hệ thống Logo" />
-            <h1 className="text-2xl font-bold text-blue-800 ml-3">Hệ thống</h1>
-          </div>
+          <Link to={dashboardPath} className="block">
+            <div className="relative h-20 border-b border-blue-200">
+              <img 
+                className={`absolute ${logoHeightClass} ${logoTop} ${logoLeft} ${logoRight} w-auto`} 
+                src="/assets/images/logo.png" 
+                alt="Hệ thống Logo" />
+              <h1 className={`absolute text-2xl font-bold text-blue-800 ${titleTop} ${titleLeft} ${titleRight}`}>Hệ thống</h1>
+            </div>
+          </Link>
           <NavigationMenu userRole={userRole} />
         </div>
       </div>
@@ -173,7 +232,7 @@ const Layout = () => {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 justify-between lg:justify-end">
+        <div className="sticky top-0 z-40 flex h-20 shrink-0 items-center gap-x-4 border-b border-blue-200 bg-blue-50 px-4 sm:gap-x-6 sm:px-6 lg:px-8 justify-between lg:justify-end">
           <button
             type="button"
             className="-m-2.5 p-2.5 text-gray-700 lg:hidden"

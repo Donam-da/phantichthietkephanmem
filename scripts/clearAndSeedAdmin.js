@@ -39,7 +39,7 @@ const seedAdmin = async () => {
 
         const adminUser = new User({
             firstName: 'Admin',
-            lastName: 'User',
+            lastName: '.', // Sử dụng dấu chấm để vượt qua validation 'required'
             email: 'admin@example.com',
             password: '123456', // Mật khẩu sẽ được hash tự động bởi model
             role: 'admin',
