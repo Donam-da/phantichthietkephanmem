@@ -220,10 +220,10 @@ const Schedule = () => {
 
                 <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
+                        <table className="min-w-full border-collapse table-fixed">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Ca học</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%] border-b border-gray-200">Ca học</th>
                                     {displayDays.map(day => (
                                         <th key={day.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             {day.name} <br/> <span className="font-normal normal-case text-gray-600">({day.dateString})</span>
@@ -231,10 +231,10 @@ const Schedule = () => {
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-white">
                                 {periods.map(period => (
-                                    <tr key={period.id}>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <tr key={period.id} className="border-b border-gray-200">
+                                        <td className="px-4 py-4 align-top text-sm font-medium text-gray-900 border-r border-gray-200">
                                             <div className="flex items-center">
                                                 <Clock className="h-4 w-4 mr-2 text-blue-500" />
                                                 {period.time}
@@ -250,22 +250,25 @@ const Schedule = () => {
                                                 day.dateObject <= new Date(new Date(currentSemester.endDate).setHours(23, 59, 59, 999));
 
                                             return (
-                                                <td key={key} className="px-2 py-2 align-top text-xs">
-                                                    {isWithinSemester && slots.length > 0 ? (
+                                                <td key={key} className="px-2 py-2 align-top text-xs border-r border-gray-200">
+                                                    {isWithinSemester && slots.length > 0 ? ( // Giữ lại dòng này
                                                         <div className="space-y-2">
                                                             {slots.map((slot, index) => (
-                                                                <div key={index} className="bg-blue-50 border border-blue-200 rounded-lg p-2 space-y-1">
-                                                                    <div className="flex items-center font-bold text-blue-800">
+                                                                <div key={index} className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex flex-col h-[150px] overflow-hidden">
+                                                                    {/* Tên môn học - chiếm 1/2 không gian */}
+                                                                    <div className="flex items-start font-bold text-blue-800 h-1/2">
                                                                         <BookOpen size={14} className="mr-1.5" />
-                                                                        <span>{slot.subjectName} ({slot.classCode})</span>
+                                                                        <span className="truncate-2-lines">{slot.subjectName} ({slot.classCode})</span>
                                                                     </div>
-                                                                    <div className="flex items-center text-gray-700">
-                                                                        <User size={14} className="mr-1.5" />
-                                                                        <span>{slot.teacher}</span>
+                                                                    {/* Tên giảng viên - chiếm 1/4 không gian */}
+                                                                    <div className="flex items-center text-gray-700 h-1/4 truncate">
+                                                                        <User size={14} className="mr-1.5 flex-shrink-0" />
+                                                                        <span className="truncate">{slot.teacher}</span>
                                                                     </div>
-                                                                    <div className="flex items-center text-gray-700">
-                                                                        <MapPin size={14} className="mr-1.5" />
-                                                                        <span>Phòng: {slot.classroom}</span>
+                                                                    {/* Phòng học - chiếm 1/4 không gian */}
+                                                                    <div className="flex items-center text-gray-700 h-1/4 truncate">
+                                                                        <MapPin size={14} className="mr-1.5 flex-shrink-0" />
+                                                                        <span className="truncate">Phòng: {slot.classroom}</span>
                                                                     </div>
                                                                 </div>
                                                             ))}
