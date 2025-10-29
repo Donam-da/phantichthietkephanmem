@@ -12,6 +12,7 @@ const { admin } = require('../middleware/admin');
 const { logActivity } = require('../services/logService'); // Import logService
 const multer = require('multer');
 const fs = require('fs');
+const csv = require('csv-parser');
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -543,6 +544,188 @@ router.post('/import-teachers', [auth, admin, upload.single('file')], async (req
             fs.unlinkSync(req.file.path);
         }
         res.status(500).send('Lỗi Server');
+    }
+});
+
+// @route   POST /api/users/import-students
+// @desc    Import students from a CSV file
+// @access  Private (Admin)
+router.post('/import-students', [auth, admin, upload.single('file')], async (req, res) => {
+    const { semesterId } = req.body;
+
+    if (!req.file) {
+        return res.status(400).json({ msg: 'Vui lòng tải lên một tệp CSV.' });
+    }
+
+    if (!semesterId) {
+        return res.status(400).json({ msg: 'Vui lòng chọn một học kỳ để áp dụng.' });
+    }
+
+    const errors = [];
+    const importedStudents = [];
+    const usersToInsert = [];
+    const schoolMap = new Map();
+    let rowCount = 0;
+
+    try {
+        // 1. Lấy và tạo map cho các trường học để tra cứu nhanh
+        const allSchools = await School.find().select('_id schoolCode');
+        allSchools.forEach(s => schoolMap.set(s.schoolCode.toUpperCase(), s._id));
+
+        // Lấy thông tin học kỳ đã chọn
+        const selectedSemester = await Semester.findOne({ _id: semesterId, isActive: true });
+        if (!selectedSemester) {
+            return res.status(404).json({ msg: 'Học kỳ được chọn không hợp lệ hoặc không hoạt động.' });
+        }
+
+        // 2. Đọc và xử lý file CSV
+        const results = await new Promise((resolve, reject) => {
+            const tempResults = [];
+            fs.createReadStream(req.file.path)
+                .pipe(csv())
+                .on('data', (data) => tempResults.push(data))
+                .on('end', () => resolve(tempResults))
+                .on('error', (error) => reject(error));
+        });
+
+        const emailsInFile = new Set();
+        const studentIdsInFile = new Set();
+        const potentialUsers = [];
+
+        for (const row of results) {
+            rowCount++;
+            const { fullName, email, password, studentId, schoolCode, year } = row;
+
+            // 3. Validate dữ liệu từng dòng
+            if (!fullName || !email || !password || !studentId || !schoolCode || !year) {
+                errors.push({ row: rowCount, msg: 'Thiếu thông tin bắt buộc (fullName, email, password, studentId, schoolCode, year).', data: row });
+                continue;
+            }
+
+            const parsedYear = parseInt(year, 10);
+            if (isNaN(parsedYear) || parsedYear < 1) {
+                errors.push({ row: rowCount, msg: `Năm học '${year}' không hợp lệ.`, data: row });
+                continue;
+            }
+
+            // Kiểm tra trùng lặp trong chính file CSV
+            if (emailsInFile.has(email.toLowerCase())) {
+                errors.push({ row: rowCount, msg: `Email '${email}' bị trùng lặp trong tệp.`, data: row });
+                continue;
+            }
+            if (studentIdsInFile.has(studentId)) {
+                errors.push({ row: rowCount, msg: `Mã sinh viên '${studentId}' bị trùng lặp trong tệp.`, data: row });
+                continue;
+            }
+            emailsInFile.add(email.toLowerCase());
+            studentIdsInFile.add(studentId);
+
+            potentialUsers.push({ row, rowNum: rowCount });
+        }
+
+        // 4. Kiểm tra hàng loạt với DB
+        if (potentialUsers.length > 0) {
+            const existingUsers = await User.find({ $or: [{ email: { $in: Array.from(emailsInFile) } }, { studentId: { $in: Array.from(studentIdsInFile) } }] }).select('email studentId');
+            const existingEmails = new Set(existingUsers.map(u => u.email.toLowerCase()));
+            const existingStudentIds = new Set(existingUsers.map(u => u.studentId));
+
+            for (const { row, rowNum } of potentialUsers) {
+                const { fullName, email, password, studentId, schoolCode, year } = row;
+
+                if (existingEmails.has(email.toLowerCase()) || existingStudentIds.has(studentId)) {
+                    errors.push({ row: rowNum, msg: `Email hoặc Mã sinh viên '${email}/${studentId}' đã tồn tại trong hệ thống.`, data: row });
+                    continue;
+                }
+
+                // Tìm schoolId từ schoolCode
+                const schoolId = schoolMap.get(schoolCode.toUpperCase());
+                if (!schoolId) {
+                    errors.push({ row: rowNum, msg: `Mã trường '${schoolCode}' không hợp lệ.`, data: row });
+                    continue;
+                }
+
+                // Tách họ và tên
+                const nameParts = fullName.trim().split(' ');
+                const lastName = nameParts.pop() || '';
+                const firstName = nameParts.join(' ');
+
+                // Băm mật khẩu
+                const salt = await bcrypt.genSalt(10);
+                const hashedPassword = await bcrypt.hash(password, salt);
+
+                usersToInsert.push({
+                    firstName,
+                    lastName,
+                    email,
+                    password: hashedPassword,
+                    studentId,
+                    school: schoolId,
+                    year: parseInt(year, 10), // Sử dụng năm học từ file CSV
+                    semester: selectedSemester.semesterNumber, // Use the semester number from the selected semester
+                    maxCredits: selectedSemester.maxCreditsPerStudent, // Gán tín chỉ tối đa từ học kỳ đã chọn
+                    role: 'student',
+                    isActive: true,
+                    // Thêm rowNum để truy vết lỗi
+                    originalRowNum: rowNum
+                });
+            }
+        }
+
+        // 5. Thêm hàng loạt vào database
+        if (usersToInsert.length > 0) {
+            console.log(`[Import Students] Attempting to insert ${usersToInsert.length} users.`);
+            try {
+                const result = await User.insertMany(usersToInsert, { ordered: false });
+                importedStudents.push(...result);
+                console.log(`[Import Students] Successfully inserted ${result.length} users.`);
+            } catch (bulkWriteError) {
+                // Xử lý lỗi khi insert hàng loạt (ví dụ: lỗi trùng lặp)
+                if (bulkWriteError.writeErrors) {
+                    // Lấy danh sách các bản ghi đã insert thành công
+                    importedStudents.push(...(bulkWriteError.insertedDocs || []));
+
+                    // Ghi nhận các lỗi
+                    bulkWriteError.writeErrors.forEach(err => {
+                        const failedUser = usersToInsert[err.index];
+                        errors.push({ 
+                            row: failedUser.originalRowNum, 
+                            msg: `Lỗi với email ${failedUser.email}: ${err.errmsg}`,
+                            data: failedUser
+                        });
+                        console.error(`[Import Students] BulkWriteError for row ${failedUser.originalRowNum}: ${err.errmsg}`);
+                    });
+                } else {
+                    // Lỗi chung khác không phải BulkWriteError
+                    throw bulkWriteError;
+                    console.error(`[Import Students] Unexpected BulkWriteError:`, bulkWriteError);
+                }
+            }
+        }
+
+        // 6. Ghi log và trả về kết quả
+        if (importedStudents.length > 0) {
+            logActivity(req.user.id, 'BULK_CREATE_STUDENTS', {
+                targetType: 'User',
+                details: { message: `Admin imported ${importedStudents.length} students from CSV.` }
+            });
+        }
+
+        res.json({
+            msg: `Đã xử lý ${rowCount} dòng. Thêm thành công ${importedStudents.length} sinh viên.`,
+            processedCount: rowCount,
+            importedCount: importedStudents.length,
+            failedCount: errors.length,
+            errors: errors
+        });
+
+    } catch (err) {
+        console.error("Lỗi khi import sinh viên:", err.message);
+        res.status(500).send('Lỗi Server');
+    } finally {
+        // Xóa file tạm sau khi xử lý xong
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
     }
 });
 

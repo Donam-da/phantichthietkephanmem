@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, Upload, FileText, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import ConfirmPasswordModal from '../components/ConfirmPasswordModal';
@@ -11,6 +11,7 @@ const UserManagement = () => {
   const [roleFilter, setRoleFilter] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [schools, setSchools] = useState([]);
@@ -19,6 +20,12 @@ const UserManagement = () => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  // State cho import
+  const [importFile, setImportFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSemesterId, setImportSemesterId] = useState('');
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -26,33 +33,36 @@ const UserManagement = () => {
     fetchActiveSemesters();
   }, []); // Thêm fetchActiveSemesters vào useEffect
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (showToast = false) => {
+    setLoading(true);
     try {
       const response = await api.get('/api/users');
       // Sắp xếp người dùng theo vai trò: admin > teacher > student
       const sortedUsers = (response.data.users || []).sort((a, b) => {
         const roleOrder = { admin: 1, teacher: 2, student: 3 };
-        const roleA = roleOrder[a.role] || 4;
-        const roleB = roleOrder[b.role] || 4;
+        const roleA = roleOrder[a.role] || 99;
+        const roleB = roleOrder[b.role] || 99;
 
         // Nếu cả hai đều là giảng viên, sắp xếp theo số lớp được phân công
         if (a.role === 'teacher' && b.role === 'teacher') {
           return (b.assignedCourseCount ?? 0) - (a.assignedCourseCount ?? 0);
         }
 
-        // Sắp xếp theo vai trò
         if (roleA !== roleB) {
           return roleA - roleB;
         }
         return a.lastName.localeCompare(b.lastName); // Sắp xếp theo tên nếu cùng vai trò
       });
       setUsers(sortedUsers);
+      setLoading(false);
+      if (showToast) {
+        toast.success('Dữ liệu đã được làm mới!');
+      }
     } catch (error) {
       toast.error('Lỗi khi tải danh sách người dùng');
-    } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchSchools = async () => {
     try {
@@ -145,30 +155,109 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteUser = (user) => {
-    if (!user) return;
-    setConfirmAction(() => (password) => executeDelete(user._id, password));
-    setIsConfirmModalOpen(true);
-  };
-
-  const executeDelete = async (userId, password) => {
+  const executeDelete = useCallback(async (userId, password) => {
     setIsConfirming(true);
     const toastId = toast.loading('Đang xóa người dùng...');
     try {
-      // Giả sử API xóa người dùng yêu cầu mật khẩu của admin để xác nhận
       await api.delete(`/api/users/${userId}`, { data: { password } });
       toast.success('Xóa người dùng thành công!', { id: toastId });
-      closeDetailModal(); // Đóng modal chi tiết sau khi xóa
-      fetchUsers(); // Tải lại danh sách người dùng
+      closeDetailModal();
+      window.location.reload(); // Tải lại toàn bộ trang
     } catch (error) {
       toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
     } finally {
       setIsConfirming(false);
       setIsConfirmModalOpen(false);
     }
+  }, []);
+
+  const handleDeleteUser = useCallback((user) => {
+    if (!user) return;
+    setConfirmAction(() => (password) => executeDelete(user._id, password));
+    setIsConfirmModalOpen(true);
+  }, [executeDelete]);
+  
+  const handleSelectUser = (userId) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allUserIds = filteredUsers.map(user => user._id);
+      setSelectedUsers(allUserIds);
+    } else {
+      setSelectedUsers([]);
+    }
+  };
+
+  const executeDeleteSelected = useCallback(async (password) => {
+    setIsConfirming(true);
+    const toastId = toast.loading(`Đang xóa ${selectedUsers.length} người dùng...`);
+    try {
+      await api.delete('/api/users', { data: { userIds: selectedUsers, password } });
+      toast.success('Xóa thành công!', { id: toastId });
+      setSelectedUsers([]);
+      window.location.reload(); // Tải lại toàn bộ trang
+    } catch (error) {
+      toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+    } finally {
+      setIsConfirming(false);
+      setIsConfirmModalOpen(false);
+    }
+  }, [selectedUsers]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedUsers.length === 0) return;
+    setConfirmAction(() => (password) => executeDeleteSelected(password));
+    setIsConfirmModalOpen(true);
+  }, [executeDeleteSelected, selectedUsers.length]);
+
+  const handleFileChange = (e) => {
+    setImportFile(e.target.files[0]);
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast.error('Vui lòng chọn một tệp CSV.');
+      return;
+    }
+    if (!importSemesterId) {
+      toast.error('Vui lòng chọn học kỳ để áp dụng.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+    formData.append('semesterId', importSemesterId);
+
+    setIsImporting(true);
+    setImportResult(null); // Reset kết quả trước khi import mới
+    const toastId = toast.loading('Đang import dữ liệu sinh viên...');
+
+    try {
+      const res = await api.post('/api/users/import-students', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      toast.success(res.data.msg, { id: toastId, duration: 5000 });
+      setImportResult(res.data);
+      // Không đóng modal hoặc tải lại ngay để người dùng xem kết quả
+    } catch (error) {
+      toast.error(error.response?.data?.msg || 'Lỗi khi import file.', { id: toastId });
+    } finally {
+      setIsImporting(false);
+      setImportFile(null); // Reset file input
+      // Không reset semesterId để người dùng có thể import tiếp file khác vào cùng học kỳ
+    }
   };
 
   const handleRowDoubleClick = (user) => {
+    // Only open detail modal for students
     if (user.role === 'student') openStudentDetail(user._id);
   };
 
@@ -193,9 +282,36 @@ const UserManagement = () => {
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-900">Quản lý người dùng</h1>
-          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary flex items-center gap-2">
-            <Plus size={18} /> Tạo người dùng
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedUsers.length > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                className="btn btn-danger flex items-center gap-2"
+              >
+                <Trash2 size={18} />
+                Xóa ({selectedUsers.length})
+              </button>
+            )}
+            {/* Nút làm mới dữ liệu */}
+            <button onClick={() => window.location.reload()} className="btn btn-secondary flex items-center gap-2" title="Làm mới dữ liệu">
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <div className="h-6 w-px bg-gray-300"></div> {/* Dải phân cách */}
+            {/* Các nút Import và Tạo tài khoản sinh viên, chỉ hiển thị nếu không phải là giáo viên */}
+            {/* Đã bọc trong React.Fragment để tránh lỗi cú pháp */}
+            {/* isTeacher là một biến từ AuthContext, cần được truyền vào component nếu muốn sử dụng */}
+            {/* Giả sử isTeacher được lấy từ useAuth() */}
+            {/* {isTeacher ? null : ( */}
+              <>
+                <button onClick={() => setShowImportModal(true)} className="btn btn-secondary flex items-center gap-2">
+                  <Upload size={18} /> Import Sinh viên
+                </button>
+                <button onClick={() => setShowCreateModal(true)} className="btn btn-primary flex items-center gap-2">
+                  <Plus size={18} /> Tạo tài khoản sinh viên
+                </button>
+              </>
+            {/* )} */}
+          </div>
         </div>
         <div className="flex gap-4 mb-4">
           <input
@@ -222,6 +338,14 @@ const UserManagement = () => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th scope="col" className="px-6 py-3">
+                <input
+                  type="checkbox"
+                  onChange={handleSelectAll}
+                  checked={filteredUsers.length > 0 && selectedUsers.length === filteredUsers.length}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+              </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider w-16">STT</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Thông tin người dùng</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Vai trò</th>
@@ -233,7 +357,16 @@ const UserManagement = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredUsers.map((userItem, index) => (
               <tr key={userItem._id} onDoubleClick={() => handleRowDoubleClick(userItem)} className={userItem.role === 'student' ? 'cursor-pointer hover:bg-gray-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={selectedUsers.includes(userItem._id)}
+                    onChange={() => handleSelectUser(userItem._id)}
+                    onClick={(e) => e.stopPropagation()} // Ngăn double-click khi chọn checkbox
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" onClick={() => handleSelectUser(userItem._id)}>{index + 1}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
@@ -356,6 +489,104 @@ const UserManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-6 border w-full max-w-2xl shadow-lg rounded-xl bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Import danh sách sinh viên từ CSV</h3>
+              <button onClick={() => { setShowImportModal(false); setImportResult(null); }} className="p-1 rounded-full hover:bg-gray-200">✕</button>
+            </div>
+
+            {!importResult ? (
+              <div className="space-y-4">
+                <div className="p-4 border-l-4 border-blue-400 bg-blue-50 text-blue-700">
+                  <p className="font-bold">Hướng dẫn:</p>
+                  <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                    <li>Chọn một học kỳ đang hoạt động để gán cho tất cả sinh viên trong tệp.</li>
+                    <li>Tệp tải lên phải là định dạng <strong>CSV</strong>.</li>
+                    <li>Các cột bắt buộc trong tệp: <strong>fullName, email, password, studentId, schoolCode, year</strong>.</li>
+                    <li>Dòng đầu tiên sẽ được coi là tiêu đề và bị bỏ qua.</li>
+                  </ul>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Chọn học kỳ áp dụng</label>
+                    <select
+                      value={importSemesterId}
+                      onChange={(e) => setImportSemesterId(e.target.value)}
+                      className="input-field"
+                      required
+                    >
+                      <option value="">-- Chọn học kỳ --</option>
+                      {activeSemesters.map(s => (
+                        <option key={s._id} value={s._id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                  <label className="form-label">Chọn tệp CSV</label>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                </div>
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <button type="button" onClick={() => { setShowImportModal(false); setImportResult(null); setImportSemesterId(''); }} className="btn btn-secondary">Hủy</button>
+                  <button onClick={handleImport} disabled={isImporting || !importFile || !importSemesterId} className="btn btn-primary">
+                    {isImporting ? 'Đang xử lý...' : 'Tải lên và Tạo'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800">Kết quả Import</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                  <div className="p-3 bg-gray-100 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-700">{importResult.processedCount}</p>
+                    <p className="text-sm text-gray-500">Dòng đã xử lý</p>
+                  </div>
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <p className="text-2xl font-bold text-green-700">{importResult.importedCount}</p>
+                    <p className="text-sm text-green-600">Thêm thành công</p>
+                  </div>
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <p className="text-2xl font-bold text-red-700">{importResult.failedCount}</p>
+                    <p className="text-sm text-red-600">Thất bại</p>
+                  </div>
+                </div>
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <div>
+                    <h5 className="font-semibold text-red-600 mb-2">Chi tiết lỗi:</h5>
+                    <div className="max-h-48 overflow-y-auto border rounded-md p-2 bg-red-50 text-sm">
+                      <ul className="list-disc list-inside space-y-1">
+                        {importResult.errors.map((err, index) => (
+                          <li key={index} className="text-red-800">
+                            <strong>Dòng {err.row}:</strong> {err.msg}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-end pt-4">
+                  <button onClick={() => { setImportResult(null); setImportFile(null); }} className="btn btn-secondary mr-2">Import tệp khác</button>
+                  <button onClick={() => { 
+                    setShowImportModal(false); 
+                    setImportResult(null); 
+                    setImportSemesterId('');
+                    fetchUsers(); // Tải lại dữ liệu khi đóng modal
+                  }} className="btn btn-primary">Đóng</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

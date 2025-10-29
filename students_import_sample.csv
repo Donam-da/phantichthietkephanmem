@@ -1,0 +1,11 @@
+fullName,email,password,studentId,schoolCode,year
+Nguyễn Văn An,vanan@example.com,password123,21010001,CNTT,1
+Trần Thị Bình,thibinh@example.com,password123,21010002,KT,1
+Lê Hoàng Cường,hoangcuong@example.com,password123,21010003,YD,2
+Phạm Thị Dung,thidung@example.com,password123,21010004,NN-KH,2
+Võ Minh Tuấn,minhtuan@example.com,password123,21010005,CNTT,3
+Đặng Ngọc Mai,ngocmai@example.com,password123,21010006,KTE,3
+Hoàng Văn Long,vanlong@example.com,password123,21010007,YD,4
+Bùi Thị Thảo,thithao@example.com,password123,21010008,NN-KH,4
+Ngô Gia Huy,giahuy@example.com,password123,21010009,KT,1
+Dương Thị Yến,thiyen@example.com,password123,21010010,CNTT,2
