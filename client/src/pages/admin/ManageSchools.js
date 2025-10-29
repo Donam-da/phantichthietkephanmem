@@ -1,6 +1,6 @@
 // client/src/pages/admin/ManageSchools.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit, Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 // Giả định bạn có một file api service, nếu không có thể dùng axios trực tiếp
 // import api from '../../services/api'; 

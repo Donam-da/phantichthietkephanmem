@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, X, Clock, ArrowRight, Upload, Plus, Edit } from 'lucide-react';
+import { Trash2, X, Clock, ArrowRight, Upload, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import ConfirmPasswordModal from '../../components/ConfirmPasswordModal';

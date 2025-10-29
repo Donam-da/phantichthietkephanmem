@@ -197,8 +197,8 @@ const Layout = () => {
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-blue-50">
-          <Link to={dashboardPath} className="block">
-            <div className="relative h-20 px-4 border-b border-blue-200">
+          <Link to={dashboardPath} className="block h-24">
+            <div className="relative h-full px-4 border-b border-blue-200">
               <img 
                 className={`absolute ${logoHeightClass} ${logoTop} ${logoLeft} ${logoRight} w-auto`} 
                 src="/assets/images/logo.png" 
@@ -217,8 +217,8 @@ const Layout = () => {
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-blue-50 border-r border-gray-200">
-          <Link to={dashboardPath} className="block">
-            <div className="relative h-20 border-b border-blue-200">
+          <Link to={dashboardPath} className="block h-24">
+            <div className="relative h-full border-b border-blue-200">
               <img 
                 className={`absolute ${logoHeightClass} ${logoTop} ${logoLeft} ${logoRight} w-auto`} 
                 src="/assets/images/logo.png" 
@@ -233,7 +233,7 @@ const Layout = () => {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-20 shrink-0 items-center gap-x-4 border-b border-blue-200 bg-blue-50 px-4 sm:gap-x-6 sm:px-6 lg:px-8 justify-between lg:justify-end">
+        <div className="sticky top-0 z-40 flex h-24 shrink-0 items-center gap-x-4 border-b border-blue-200 bg-blue-50 px-4 sm:gap-x-6 sm:px-6 lg:px-8 justify-between lg:justify-end">
           <button
             type="button"
             className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
