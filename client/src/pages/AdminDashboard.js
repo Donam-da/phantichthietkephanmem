@@ -43,6 +43,24 @@ const AdminDashboard = () => {
     } catch (error) { toast.error('Không thể kiểm tra trạng thái hệ thống.'); }
   };
 
+  // NEW: Polling for system status every 15 seconds
+  useEffect(() => {
+    // Initial fetch of system status
+    fetchSystemStatus(); // Fetch on component mount
+
+    // Set up interval for periodic refresh
+    const intervalId = setInterval(fetchSystemStatus, 15000); // 15 seconds
+
+    // --- NEW: Listen for immediate health check requests from the API interceptor ---
+    const handleHealthChange = () => fetchSystemStatus();
+    window.addEventListener('system-health-change', handleHealthChange);
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('system-health-change', handleHealthChange);
+    };
+  }, []); // Empty dependency array means this runs once on mount and cleans up on unmount
   useEffect(() => {
     fetchDashboardData();
   }, []);
