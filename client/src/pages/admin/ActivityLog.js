@@ -90,7 +90,7 @@ const ActivityLog = () => {
     return (
         <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">Nhật ký hoạt động hệ thống</h1>
+                <h1 className="text-2xl font-bold text-blue-700 mb-4 md:mb-0">Nhật ký hệ thống</h1>
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                     <Filter size={16} className="text-gray-500" />
                     <div className="flex items-center gap-2">

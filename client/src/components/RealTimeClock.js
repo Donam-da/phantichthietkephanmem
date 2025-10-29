@@ -64,7 +64,7 @@ const RealTimeClock = () => {
         {ticks}
 
         {/* Khung hiển thị ngày tháng (phía trên, 12 giờ) */}
-        <rect x="38" y="20" width="24" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
+        <rect x="38" y="18" width="24" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
         <text
           x="50"
           y="26"
@@ -78,7 +78,7 @@ const RealTimeClock = () => {
         </text>
 
         {/* Khung hiển thị giờ (bên trái, 9 giờ) */}
-        <rect x="15" y="44" width="20" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
+        <rect x="15" y="43" width="20" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
         <text
           x="25"
           y="50"
@@ -92,7 +92,7 @@ const RealTimeClock = () => {
         </text>
 
         {/* Khung hiển thị phút (bên phải, 3 giờ) */}
-        <rect x="65" y="44" width="20" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
+        <rect x="65" y="43" width="20" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
         <text
           x="75"
           y="50"
@@ -106,7 +106,7 @@ const RealTimeClock = () => {
         </text>
 
         {/* Khung hiển thị giây (phía dưới, 6 giờ) */}
-        <rect x="40" y="68" width="20" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
+        <rect x="40" y="67" width="20" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
         <text
           x="50"
           y="74"
