@@ -12,6 +12,7 @@ const CourseManagement = () => {
   const [teachers, setTeachers] = useState([]);
   const [semesters, setSemesters] = useState([]);
   const [classrooms, setClassrooms] = useState([]);
+  const [allSchools, setAllSchools] = useState([]); // State mới cho danh sách trường
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
@@ -29,6 +30,7 @@ const CourseManagement = () => {
     semester: '',
     subject: '',
     searchTerm: '',
+    school: '', // State mới cho bộ lọc trường
     onlyMyCourses: true, // New filter state for teachers
   });
   const [formData, setFormData] = useState({
@@ -95,15 +97,17 @@ const CourseManagement = () => {
           api.get('/api/subjects'),
           api.get('/api/semesters?isActive=true'),
           api.get('/api/classrooms'),
+          api.get('/api/schools'), // Thêm API call để lấy danh sách trường
         ];
         if (!isTeacher) {
           apiCalls.push(api.get('/api/users?role=teacher&populateSchools=true')); // NEW: Request teachers with populated schools
         }
-        const [subjectsRes, semestersRes, classroomsRes, teachersRes] = await Promise.all(apiCalls);
+        const [subjectsRes, semestersRes, classroomsRes, schoolsRes, teachersRes] = await Promise.all(apiCalls);
 
         setSubjects(subjectsRes.data);
         setSemesters(semestersRes.data);
         setClassrooms(classroomsRes.data);
+        setAllSchools(schoolsRes.data); // Lưu danh sách trường
         if (teachersRes) {
           setTeachers(teachersRes.data.users);
         }
@@ -123,12 +127,20 @@ const CourseManagement = () => {
     fetchStaticData();
   }, [isTeacher]); // Removed user from dependency array as it's not directly used here
 
+  // NEW: Reset subject filter when school filter changes
+  useEffect(() => {
+    // When school filter changes, reset the subject filter
+    // to avoid an inconsistent state where a subject is selected
+    // but not visible in the dropdown.
+    setFilters(prev => ({ ...prev, subject: '' }));
+  }, [filters.school]);
   const fetchCourses = useCallback(async () => {
     if (!filters.semester) return;
     try {
       setLoading(true);
       const params = new URLSearchParams();
       if (filters.semester) params.append('semester', filters.semester);
+      if (filters.school) params.append('school', filters.school); // Gửi schoolId lên backend
       // FIX: If user is a teacher, add the teacher filter to the main API call
       if (isTeacher) {
         params.append('teacher', user.id);
@@ -144,7 +156,7 @@ const CourseManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters.semester, isTeacher, user?.id]);
+  }, [filters.semester, filters.school, isTeacher, user?.id]); // Thêm filters.school vào dependency
 
   // NEW: Effect to sync course status on component mount for admins
   useEffect(() => {
@@ -170,6 +182,18 @@ const CourseManagement = () => {
   useEffect(() => {
     fetchCourses();
   }, [fetchCourses]);
+
+  // NEW: Create a memoized list of subjects for the dropdown based on the selected school
+  const filteredSubjectsForDropdown = React.useMemo(() => {
+    if (!filters.school) {
+      return subjects; // If no school is selected, show all subjects
+    }
+    // Filter subjects to only include those that belong to the selected school
+    return subjects.filter(sub =>
+      sub.schools && sub.schools.some(s => s._id === filters.school)
+    );
+  }, [filters.school, subjects]);
+
 
   const triggerRefetch = () => {
     setCourses([]); // Clear current courses to show loading state
@@ -229,11 +253,14 @@ const CourseManagement = () => {
 
       const term = filters.searchTerm.toLowerCase();
       const subjectMatch = !filters.subject || course.subject?._id === filters.subject;
+      // Lọc theo trường ở client-side để đảm bảo tính nhất quán
+      const schoolMatch = !filters.school || (course.subject?.schools && course.subject.schools.includes(filters.school));
+
       const searchMatch = !term ||
         course.subject?.subjectName.toLowerCase().includes(term) ||
         course.subject?.subjectCode.toLowerCase().includes(term) ||
         course.classCode.toLowerCase().includes(term);
-      return subjectMatch && searchMatch;
+      return subjectMatch && searchMatch && schoolMatch;
     })
     .sort((a, b) => {
       // Nếu đang lọc theo môn học, sắp xếp theo mã lớp
@@ -521,7 +548,7 @@ const CourseManagement = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <div>
             <label htmlFor="semester-filter" className="block text-sm font-medium text-gray-700 mb-1">Học kỳ</label>
             <select id="semester-filter" name="semester" value={filters.semester} onChange={handleFilterChange} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
@@ -532,7 +559,14 @@ const CourseManagement = () => {
             <label htmlFor="subject-filter" className="block text-sm font-medium text-gray-700 mb-1">Môn học</label>
             <select id="subject-filter" name="subject" value={filters.subject} onChange={handleFilterChange} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
               <option value="">Tất cả môn học</option>
-              {subjects.map(sub => <option key={sub._id} value={sub._id}>{sub.subjectName}</option>)}
+              {filteredSubjectsForDropdown.map(sub => <option key={sub._id} value={sub._id}>{sub.subjectName}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="school-filter" className="block text-sm font-medium text-gray-700 mb-1">Trường/Khoa</label>
+            <select id="school-filter" name="school" value={filters.school} onChange={handleFilterChange} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+              <option value="">Tất cả các trường</option>
+              {allSchools.map(sch => <option key={sch._id} value={sch._id}>{sch.schoolName}</option>)}
             </select>
           </div>
           <div>
@@ -962,11 +996,14 @@ const CourseManagement = () => {
             <thead className="bg-gray-50">
               <tr>
                 {!isTeacher && (
-                  <th scope="col" className="px-6 py-3 text-left">
-                    <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected}
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                  </th>
+                  <>
+                    <th scope="col" className="px-6 py-3 text-left">
+                      <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">STT</th>
+                  </>
                 )}
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Môn học</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giảng viên</th>
@@ -977,16 +1014,19 @@ const CourseManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCourses.map((course) => ( // Giữ lại dòng này
+              {filteredCourses.map((course, index) => ( // Giữ lại dòng này
                 <tr key={course._id} onDoubleClick={() => handleEdit(course)} className="hover:bg-gray-50 group cursor-pointer" onMouseEnter={() => setHoveredCourseId(course._id)} onMouseLeave={() => setHoveredCourseId(null)} onMouseMove={handleMouseMove}>
                   {!isTeacher && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input type="checkbox"
-                        checked={selectedCourses.includes(course._id)}
-                        onChange={() => handleSelectCourse(course._id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                    </td>
+                    <>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input type="checkbox"
+                          checked={selectedCourses.includes(course._id)}
+                          onChange={() => handleSelectCourse(course._id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
+                    </>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
