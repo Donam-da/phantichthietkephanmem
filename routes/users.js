@@ -9,6 +9,7 @@ const Semester = require('../models/Semester'); // Import Semester model
 const School = require('../models/School');
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
+const { logActivity } = require('../services/logService'); // Import logService
 const multer = require('multer');
 const fs = require('fs');
 
@@ -70,6 +71,13 @@ router.post('/', [
         });
 
         await user.save();
+
+        // Ghi log
+        logActivity(req.user.id, 'CREATE_USER', {
+            targetType: 'User',
+            targetId: user._id,
+            details: { message: `Admin created a new user: ${user.email} with role ${user.role}.` }
+        });
 
         res.status(201).json({ msg: 'Tạo người dùng thành công' });
 
@@ -151,6 +159,13 @@ router.put('/me', [
         });
 
         const updatedUser = await user.save();
+
+        // Ghi log
+        logActivity(req.user.id, 'UPDATE_PROFILE', {
+            targetType: 'User',
+            targetId: user._id,
+            details: { message: 'User updated their own profile.' }
+        });
         res.json(updatedUser.toJSON());
     } catch (err) {
         console.error(err.message);
@@ -196,6 +211,7 @@ router.put('/:id', [
         }
         
         const { firstName, lastName, email, isActive, teachingSchools, year, semester } = req.body; // Thêm year, semester
+        const changes = {}; // Để theo dõi các thay đổi
 
         // Validation cho year và semester nếu có
         // --- LOGIC MỚI: Xử lý khi vô hiệu hóa một giảng viên ---
@@ -228,13 +244,23 @@ router.put('/:id', [
         // --- KẾT THÚC LOGIC MỚI ---
 
         // Cập nhật các trường thông tin khác nếu chúng được cung cấp
-        if (firstName) userToUpdate.firstName = firstName;
-        if (lastName) userToUpdate.lastName = lastName;
+        if (firstName && userToUpdate.firstName !== firstName) {
+            changes.firstName = { from: userToUpdate.firstName, to: firstName };
+            userToUpdate.firstName = firstName;
+        }
+        if (lastName && userToUpdate.lastName !== lastName) {
+            changes.lastName = { from: userToUpdate.lastName, to: lastName };
+            userToUpdate.lastName = lastName;
+        }
         if (email && userToUpdate.email !== email) {
             // Có thể thêm logic kiểm tra email trùng lặp ở đây nếu cần
+            changes.email = { from: userToUpdate.email, to: email };
             userToUpdate.email = email;
         }
-        if (typeof isActive !== 'undefined') userToUpdate.isActive = isActive;
+        if (typeof isActive !== 'undefined' && userToUpdate.isActive !== isActive) {
+            changes.isActive = { from: userToUpdate.isActive, to: isActive };
+            userToUpdate.isActive = isActive;
+        }
         if (userToUpdate.role === 'teacher' && teachingSchools) userToUpdate.teachingSchools = teachingSchools; // NEW: Update teachingSchools
         
         // Cập nhật year và semester cho sinh viên
@@ -246,6 +272,15 @@ router.put('/:id', [
 
 
         await userToUpdate.save();
+
+        // Ghi log
+        if (Object.keys(changes).length > 0) {
+            logActivity(req.user.id, 'UPDATE_USER_BY_ADMIN', {
+                targetType: 'User',
+                targetId: userToUpdate._id,
+                details: { message: `Admin updated user ${userToUpdate.email}.`, changes }
+            });
+        }
 
         res.json({ msg: 'Cập nhật người dùng thành công', user: userToUpdate });
 
@@ -282,6 +317,13 @@ router.delete('/', [auth, admin, verifyAdminPassword], async (req, res) => {
         }
 
         const result = await User.deleteMany({ _id: { $in: userIds } });
+
+        // Ghi log
+        logActivity(req.user.id, 'BULK_DELETE_USERS', {
+            targetType: 'User',
+            details: { message: `Admin deleted ${result.deletedCount} users.`, deletedIds: userIds }
+        });
+
         res.json({ msg: `Đã xóa thành công ${result.deletedCount} người dùng.` });
     } catch (err) {
         console.error(err.message);
@@ -319,6 +361,13 @@ router.delete('/:id', [auth, admin, verifyAdminPassword], async (req, res) => {
         // --- KẾT THÚC LOGIC MỚI ---
 
         await User.findByIdAndDelete(req.params.id);
+
+        // Ghi log
+        logActivity(req.user.id, 'DELETE_USER', {
+            targetType: 'User',
+            targetId: req.params.id,
+            details: { message: `Admin deleted user ${userToDelete.email}.` }
+        });
 
         res.json({ msg: 'Người dùng đã được xóa vĩnh viễn' });
 

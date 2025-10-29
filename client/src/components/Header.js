@@ -32,8 +32,14 @@ const Header = () => {
     }, [isAdmin]);
 
     const handleLogout = () => {
-        logout();
-        navigate('/login');
+        // Gửi yêu cầu đến server để ghi log trước khi xóa token ở client
+        api.post('/api/auth/logout').catch(err => {
+            // Bỏ qua lỗi nếu có, vì hành động chính là đăng xuất ở client
+            console.error("Failed to log logout on server:", err);
+        }).finally(() => {
+            logout(); // Xóa token và cập nhật state ở client
+            navigate('/login');
+        });
     };
 
     return (

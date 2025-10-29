@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Registration = require('../models/Registration'); // Import Registration model
+const { logActivity } = require('../services/logService'); // Import logService
 const { auth } = require('../middleware/auth');
 const { admin } = require('../middleware/admin');
 
@@ -137,6 +138,13 @@ router.post('/login', [
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
+        // --- GHI LẠI HOẠT ĐỘNG ĐĂNG NHẬP ---
+        logActivity(user._id, 'LOGIN_SUCCESS', {
+            ipAddress: req.ip || req.connection.remoteAddress,
+            details: { message: `User ${user.email} logged in successfully.` }
+        });
+
+
         // --- NEW: Recalculate and sync currentCredits on login ---
         if (user.role === 'student') {
             const approvedRegistrations = await Registration.find({
@@ -236,6 +244,12 @@ router.post('/change-password', [
         user.password = newPassword;
         await user.save();
 
+        // Ghi log
+        logActivity(req.user.id, 'CHANGE_PASSWORD', {
+            ipAddress: req.ip || req.connection.remoteAddress,
+            details: { message: 'User changed their password successfully.' }
+        });
+
         res.json({ message: 'Password changed successfully' });
     } catch (error) {
         console.error('Change password error:', error.message);
@@ -298,6 +312,18 @@ router.post('/refresh-token', auth, async (req, res) => {
     } catch (error) {
         console.error('Refresh token error:', error.message);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   POST /api/auth/logout
+// @desc    Log user out
+// @access  Private
+router.post('/logout', auth, async (req, res) => {
+    try {
+        logActivity(req.user.id, 'LOGOUT', { ipAddress: req.ip || req.connection.remoteAddress });
+        res.status(200).json({ message: 'Logged out successfully.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during logout.' });
     }
 });
 

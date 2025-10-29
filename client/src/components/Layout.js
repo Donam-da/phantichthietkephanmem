@@ -17,6 +17,7 @@ import {
   LogOut,
   LayoutDashboard,
   Pin, // Thêm icon Ghim
+  History, // Thêm icon cho Log
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -45,6 +46,7 @@ const NavigationMenu = ({ userRole, onLinkClick }) => {
             { name: 'Phòng học', href: '/admin/classrooms', icon: DoorOpen }, // 5
             { name: 'Môn học', href: '/admin/subjects', icon: BookCopy }, // 6
             { name: 'Lớp học phần', href: '/admin/courses', icon: BookOpen }, // 7
+            { name: 'Nhật ký hệ thống', href: '/admin/logs', icon: History }, // NEW
             { name: 'Đăng ký', href: '/admin/registrations', icon: ClipboardList }, // 8
           ]
         }
