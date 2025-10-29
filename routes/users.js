@@ -27,8 +27,6 @@ router.post('/', [
     body('firstName', 'Họ là bắt buộc').not().isEmpty(),
     body('lastName', 'Tên là bắt buộc').not().isEmpty(),
     body('role', 'Vai trò là bắt buộc').isIn(['student', 'teacher', 'admin']),
-    body('year', 'Năm học là bắt buộc và phải là số nguyên dương').if(body('role').equals('student')).isInt({ min: 1 }),
-    body('semester', 'Học kỳ là bắt buộc và phải là số nguyên dương').if(body('role').equals('student')).isInt({ min: 1 }),
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -36,7 +34,7 @@ router.post('/', [
     }
 
     const { email, password, firstName, lastName, role, studentId, school } = req.body;
-    const { teachingSchools, year, semester } = req.body; // Thêm year, semester
+    const { teachingSchools, semesterId } = req.body;
     try {
         let user = await User.findOne({ email });
         if (user) {
@@ -51,10 +49,19 @@ router.post('/', [
         }
 
         // Lấy maxCredits từ học kỳ được chọn khi tạo sinh viên
-        let maxCreditsForStudent = 24; // Giá trị mặc định
-        if (role === 'student' && semester) {
-            const selectedSemester = await Semester.findOne({ semesterNumber: semester, academicYear: new Date().getFullYear() }); // Giả sử tìm theo năm hiện tại
-            if (selectedSemester) maxCreditsForStudent = selectedSemester.maxCreditsPerStudent;
+        let studentSemesterData = {};
+        if (role === 'student' && semesterId) {
+            const selectedSemester = await Semester.findById(semesterId);
+            if (selectedSemester) {
+                studentSemesterData = {
+                    year: 1, // Mặc định là sinh viên năm nhất khi tạo mới
+                    semester: selectedSemester.semesterNumber,
+                    maxCredits: selectedSemester.maxCreditsPerStudent,
+                };
+            } else {
+                // Fallback nếu không tìm thấy học kỳ
+                studentSemesterData = { year: 1, semester: 1, maxCredits: 24 };
+            }
         }
 
         user = new User({
@@ -65,9 +72,7 @@ router.post('/', [
             role,
             studentId: role === 'student' ? studentId : undefined,
             school: role === 'student' ? school : undefined,
-            year: role === 'student' ? year : undefined, // Thêm year cho sinh viên
-            semester: role === 'student' ? semester : undefined, // Thêm semester cho sinh viên
-            maxCredits: role === 'student' ? maxCreditsForStudent : undefined, // Gán maxCredits
+            ...(role === 'student' && studentSemesterData), // Gán year, semester, maxCredits
             teachingSchools: role === 'teacher' ? teachingSchools : undefined, // NEW: Assign teachingSchools for teachers
         });
 

@@ -15,7 +15,7 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [schools, setSchools] = useState([]);
-  const [createFormData, setCreateFormData] = useState({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '', year: '', semester: '' });
+  const [createFormData, setCreateFormData] = useState({ role: 'student', fullName: '', email: '', password: '', school: '', studentId: '', semesterId: '' });
   const [activeSemesters, setActiveSemesters] = useState([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -114,19 +114,6 @@ const UserManagement = () => {
     setCreateFormData({ ...createFormData, [e.target.name]: e.target.value });
   };
 
-  // Hàm mới để xử lý khi chọn một học kỳ
-  const handleSemesterSelectionChange = (e) => {
-    const selectedSemesterId = e.target.value;
-    const selectedSemester = activeSemesters.find(s => s._id === selectedSemesterId);
-    if (selectedSemester) {
-      setCreateFormData(prev => ({
-        ...prev,
-        year: selectedSemester.semesterNumber, // Cập nhật năm học
-        semester: selectedSemester.semesterNumber, // Cập nhật số học kỳ
-      }));
-    }
-  };
-
   const handleCreateUser = async (e) => {
     e.preventDefault();
     const toastId = toast.loading('Đang tạo người dùng...');
@@ -148,7 +135,7 @@ const UserManagement = () => {
 
       toast.success('Tạo người dùng thành công!', { id: toastId });
       setShowCreateModal(false);
-      setCreateFormData({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '', year: '', semester: '' });
+      setCreateFormData({ role: 'student', fullName: '', email: '', password: '', school: '', studentId: '', semesterId: '' });
       fetchUsers();
     } catch (error) {
       toast.error(error.response?.data?.msg || 'Lỗi khi tạo người dùng.', { id: toastId });
@@ -459,8 +446,9 @@ const UserManagement = () => {
                 <div>
                   <label className="form-label">Học kỳ nhập học</label>
                   <select
-                    name="semesterSelection" // Tên mới cho dropdown
-                    onChange={handleSemesterSelectionChange}
+                    name="semesterId"
+                    value={createFormData.semesterId}
+                    onChange={handleCreateFormChange}
                     className="input-field"
                     required
                   >

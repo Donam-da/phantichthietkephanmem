@@ -22,6 +22,7 @@ const SemesterManagement = () => {
   const [formData, setFormData] = useState({
     code: '',
     namePart: '', // New state for the part of the name user types
+    semesterNumber: 1, // Sẽ được suy luận, nhưng khởi tạo để tránh lỗi
     // academicYear is now split
     academicYearStart: initialYear.start,
     academicYearEnd: initialYear.end,
@@ -44,47 +45,230 @@ const SemesterManagement = () => {
     }
   }, [formData.namePart, formData.academicYearStart, formData.academicYearEnd]);
 
+  // Effect to auto-fill dates based on semester name and year
+  useEffect(() => {
+    // Only run when creating a new semester, not when editing
+    if (editingSemester) return;
+
+    const { namePart, academicYearStart, academicYearEnd } = formData;
+    // Chỉ chạy nếu có đủ thông tin và có ít nhất một học kỳ đã tồn tại để làm mốc
+    if (!namePart || !academicYearStart || !academicYearEnd || semesters.length === 0) {
+      // Nếu không có học kỳ nào, hoặc thiếu thông tin, reset các ngày về rỗng
+      setFormData(prev => ({
+        ...prev,
+        startDate: '',
+        endDate: '',
+        registrationStartDate: '',
+        registrationEndDate: '',
+        withdrawalDeadline: '',
+      }));
+      return;
+    }
+
+    // Determine semester number from namePart
+    let newSemesterNumber;
+    const namePartLower = String(namePart).toLowerCase();
+    if (namePartLower.includes('1') || namePartLower.includes('một')) newSemesterNumber = 1;
+    else if (namePartLower.includes('2') || namePartLower.includes('hai')) newSemesterNumber = 2;
+    else if (namePartLower.includes('3') || namePartLower.includes('ba') || namePartLower.includes('hè') || namePartLower.includes('phụ')) newSemesterNumber = 3;
+    else {
+      // Nếu không xác định được số học kỳ, reset các ngày về rỗng
+      setFormData(prev => ({
+        ...prev,
+        startDate: '',
+        endDate: '',
+        registrationStartDate: '',
+        registrationEndDate: '',
+        withdrawalDeadline: '',
+      }));
+      return;
+    }
+
+    const newAcademicYearStart = parseInt(`20${academicYearStart}`, 10);
+
+    // --- UPDATED LOGIC: Use the CURRENT semester as the baseline, fallback to latest semester ---
+    const currentSemester = semesters.find(s => s.isCurrent);
+    const baselineSemester = currentSemester || semesters[0]; // Use current, else latest
+
+    // If there's no baseline semester (e.g., no semesters in system), reset dates and return.
+    if (!baselineSemester) {
+      setFormData(prev => ({ ...prev, startDate: '', endDate: '', registrationStartDate: '', registrationEndDate: '', withdrawalDeadline: '' }));
+      return;
+    }
+
+    const baselineAcademicYearStart = parseInt(baselineSemester.academicYear.split('-')[0], 10);
+    const baselineSemesterNumber = baselineSemester.semesterNumber;
+
+    // --- NEW LOGIC: Calculate semester distance and apply formula ---
+    const semesterValue = (year, number) => year * 3 + number;
+    const baselineValue = semesterValue(baselineAcademicYearStart, baselineSemesterNumber);
+    const newValue = semesterValue(newAcademicYearStart, newSemesterNumber);
+    const semesterDistance = newValue - baselineValue;
+
+    // Nếu không có sự thay đổi (tạo trùng học kỳ), không làm gì cả
+    if (semesterDistance === 0) return;
+
+    const dayOffset = semesterDistance * 115;
+
+    const calculateNewDate = (dateString, days) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      date.setDate(date.getDate() + days);
+      return date.toISOString().split('T')[0];
+    };
+
+    const newStartDate = calculateNewDate(baselineSemester.startDate, dayOffset);
+    const newEndDate = calculateNewDate(baselineSemester.endDate, dayOffset);
+    const newRegStartDate = calculateNewDate(baselineSemester.registrationStartDate, dayOffset);
+    const newRegEndDate = calculateNewDate(baselineSemester.registrationEndDate, dayOffset);
+    const newWithdrawalDeadline = calculateNewDate(baselineSemester.withdrawalDeadline, dayOffset);
+
+    setFormData(prev => ({
+      ...prev,
+      startDate: newStartDate,
+      endDate: newEndDate,
+      registrationStartDate: newRegStartDate,
+      registrationEndDate: newRegEndDate,
+      withdrawalDeadline: newWithdrawalDeadline,
+    }));
+  }, [formData.namePart, formData.academicYearStart, formData.academicYearEnd, semesters, editingSemester]);
+
   const fetchSemesters = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await api.get('/api/semesters');
-      setSemesters(response.data);
+      const fetchedSemesters = response.data;
+      setSemesters(fetchedSemesters);
+
+      // Logic tự động kích hoạt học kỳ nếu ngày đăng ký bắt đầu là hôm nay
+      const today = new Date();
+
+      const semesterToActivate = fetchedSemesters.find(sem => {
+        // Lấy ngày bắt đầu đăng ký và ngày kết thúc học kỳ
+        const regStartDate = new Date(sem.registrationStartDate);
+        const endDate = new Date(sem.endDate);
+
+        // Kiểm tra xem ngày hiện tại có nằm trong khoảng thời gian đó không
+        return today >= regStartDate && today <= endDate && !sem.isCurrent;
+      });
+
+      if (semesterToActivate) {
+        const toastId = toast.loading(`Tự động kích hoạt học kỳ "${semesterToActivate.name}"...`);
+        try {
+          await api.put(`/api/semesters/${semesterToActivate._id}/activate`);
+          toast.success(`Học kỳ "${semesterToActivate.name}" đã được tự động kích hoạt.`, { id: toastId });
+          return true; // Trả về true để báo hiệu cần fetch lại
+        } catch (error) {
+          toast.error(error.response?.data?.message || 'Lỗi khi tự động kích hoạt học kỳ', { id: toastId });
+        }
+      }
     } catch (error) {
       toast.error('Lỗi khi tải danh sách học kỳ');
     } finally {
       setLoading(false);
     }
+    return false; // Không cần fetch lại
   }, []);
 
   useEffect(() => {
-    fetchSemesters();
+    fetchSemesters().then(needsRefetch => {
+      if (needsRefetch) fetchSemesters();
+    });
   }, [fetchSemesters]);
 
-  const handleDateChange = (e) => {
+  const handleYearChange = (e) => {
     const { name, value } = e.target;
-    let newFormData = { ...formData, [name]: value };
 
-    // Khi ngày bắt đầu thay đổi, tự động cập nhật các ngày khác
-    if (name === 'startDate' && value) {
-      try {
-        const startDate = new Date(value);
-
-        const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + 70); // +70 ngày
-        newFormData.endDate = endDate.toISOString().split('T')[0];
-
-        const registrationStartDate = new Date(startDate);
-        registrationStartDate.setDate(startDate.getDate() - 25); // -25 ngày
-        newFormData.registrationStartDate = registrationStartDate.toISOString().split('T')[0];
-
-        const registrationEndDate = new Date(registrationStartDate);
-        registrationEndDate.setDate(registrationStartDate.getDate() + 10); // +10 ngày
-        newFormData.registrationEndDate = registrationEndDate.toISOString().split('T')[0];
-      } catch (error) {
-        console.error("Lỗi định dạng ngày tháng:", error);
-      }
+    // Chỉ cho phép nhập số
+    if (value && !/^\d*$/.test(value)) {
+      return;
     }
 
-    setFormData(newFormData);
+    const numericValue = parseInt(value, 10);
+
+    if (name === 'academicYearStart') {
+      // Nếu người dùng thay đổi năm bắt đầu, tự động cập nhật năm kết thúc
+      const newEnd = !isNaN(numericValue) ? String(numericValue + 1).slice(-2) : '';
+      setFormData(prev => ({ ...prev, academicYearStart: value, academicYearEnd: newEnd }));
+    } else if (name === 'academicYearEnd') {
+      // Nếu người dùng thay đổi năm kết thúc, tự động cập nhật năm bắt đầu
+      const newStart = !isNaN(numericValue) ? String(numericValue - 1).slice(-2) : '';
+      setFormData(prev => ({ ...prev, academicYearStart: newStart, academicYearEnd: value }));
+    }
+  };
+
+
+  const handleActivate = useCallback(async (semesterId, isAutoActivation = false) => {
+    // Tìm học kỳ được chọn trong danh sách state
+    const semesterToActivate = semesters.find(s => s._id === semesterId);
+    if (!semesterToActivate) {
+      toast.error("Không tìm thấy học kỳ để kích hoạt.");
+      return;
+    }
+
+    // Kiểm tra nếu học kỳ đã kết thúc
+    const endDate = new Date(semesterToActivate.endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // So sánh chỉ ngày, không tính giờ
+
+    if (endDate < today && !isAutoActivation) {
+      const diffTime = Math.abs(today - endDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      toast.error(`Học kỳ này đã kết thúc ${diffDays} ngày trước. Bạn không thể kích hoạt lại.`);
+      return; // Ngăn chặn việc kích hoạt
+    }
+
+    const toastId = isAutoActivation ? 'autoActivate' : toast.loading('Đang kích hoạt học kỳ...');
+    try {
+      await api.put(`/api/semesters/${semesterId}/activate`);
+      if (!isAutoActivation) {
+        toast.success('Kích hoạt học kỳ thành công', { id: toastId });
+      }
+      fetchSemesters(); // Tải lại danh sách sau khi kích hoạt thành công
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Lỗi khi kích hoạt học kỳ', { id: toastId });
+    }
+  }, [semesters, fetchSemesters]); // Thêm dependencies
+  
+
+  const handleDateChange = (e) => {
+    const { name: changedFieldName, value } = e.target;
+    if (!value) return; // Bỏ qua nếu giá trị ngày tháng rỗng
+
+    try {
+      let baseDate = new Date(value);
+      let newDates = {};
+
+      // Hàm tiện ích để định dạng ngày
+      const formatDate = (date) => date.toISOString().split('T')[0];
+
+      // Tính toán lại tất cả các ngày dựa trên ngày vừa được thay đổi
+      if (changedFieldName === 'registrationStartDate') {
+        const regStartDate = baseDate;
+        const regEndDate = new Date(regStartDate);
+        regEndDate.setDate(regStartDate.getDate() + 10);
+        const startDate = new Date(regEndDate);
+        startDate.setDate(regEndDate.getDate() + 15);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 70);
+        const withdrawalDeadline = new Date(startDate);
+        withdrawalDeadline.setDate(startDate.getDate() + 35);
+
+        newDates = {
+          registrationStartDate: formatDate(regStartDate),
+          registrationEndDate: formatDate(regEndDate),
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate),
+          withdrawalDeadline: formatDate(withdrawalDeadline),
+        };
+      }
+      // Nếu người dùng thay đổi các ngày khác, logic tương tự có thể được thêm vào ở đây
+
+      setFormData(prev => ({ ...prev, ...newDates, [changedFieldName]: value }));
+    } catch (error) {
+      console.error("Lỗi định dạng ngày tháng:", error);
+      toast.error("Ngày tháng không hợp lệ.");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -115,6 +299,7 @@ const SemesterManagement = () => {
       toast.error('Ngày bắt đầu học kỳ phải trước ngày kết thúc.');
       return;
     }
+
     if (new Date(formData.registrationStartDate) >= new Date(formData.registrationEndDate)) {
       toast.error('Ngày bắt đầu đăng ký phải trước ngày kết thúc đăng ký.');
       return;
@@ -195,51 +380,26 @@ const SemesterManagement = () => {
     }
   };
 
-  const handleActivate = async (semesterId) => {
-    try {
-      await api.put(`/api/semesters/${semesterId}/activate`);
-      toast.success('Kích hoạt học kỳ thành công');
-      fetchSemesters();
-    } catch (error) {
-      toast.error('Lỗi khi kích hoạt học kỳ');
-    }
-  };
-
   const openNewSemesterForm = () => {
     setEditingSemester(null);
     const newYear = getCurrentAcademicYear();
-    
-    // Semester dates
-    const today = new Date();
-    const startDate = new Date(today);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 70); // Semester ends 10 weeks after it starts
-
-    // Registration dates
-    const registrationStartDate = new Date(startDate);
-    registrationStartDate.setDate(startDate.getDate() - 25); // Registration starts 25 days before semester
-    const registrationEndDate = new Date(registrationStartDate);
-    registrationEndDate.setDate(registrationStartDate.getDate() + 10); // Registration ends 10 days after it starts
-
-    // Withdrawal deadline (5 weeks after start date, which is 1/2 of the semester)
-    const withdrawalDeadline = new Date(startDate);
-    withdrawalDeadline.setDate(startDate.getDate() + 35); // 5 weeks * 7 days
 
     setFormData({
       code: '',
       namePart: '',
       academicYearStart: newYear.start,
       academicYearEnd: newYear.end,
-      startDate: today.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0], // Mặc định là 10 tuần sau
-      registrationStartDate: registrationStartDate.toISOString().split('T')[0],
-      registrationEndDate: registrationEndDate.toISOString().split('T')[0],
-      withdrawalDeadline: withdrawalDeadline.toISOString().split('T')[0],
+      startDate: '', // Để useEffect tính toán
+      endDate: '', // Để useEffect tính toán
+      registrationStartDate: '', // Để useEffect tính toán
+      registrationEndDate: '', // Để useEffect tính toán
+      withdrawalDeadline: '', // Để useEffect tính toán
       maxCreditsPerStudent: 16,
       minCreditsPerStudent: 8,
       description: ''
     });
     setShowForm(true);
+    if (nameInputRef.current) nameInputRef.current.focus();
   };
 
   if (loading) {
@@ -304,16 +464,18 @@ const SemesterManagement = () => {
                         <span className="text-gray-500">20</span>
                         <input
                           type="text"
+                          name="academicYearStart"
                           value={formData.academicYearStart}
-                          onChange={(e) => setFormData({ ...formData, academicYearStart: e.target.value })}
+                          onChange={handleYearChange}
                           className="mt-1 block w-16 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           maxLength="2" required
                         />
                         <span className="text-gray-500">-20</span>
                         <input
                           type="text"
+                          name="academicYearEnd"
                           value={formData.academicYearEnd}
-                          onChange={(e) => setFormData({ ...formData, academicYearEnd: e.target.value })}
+                          onChange={handleYearChange}
                           className="mt-1 block w-16 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           maxLength="2" required
                         />
@@ -483,7 +645,7 @@ const SemesterManagement = () => {
                 </div>
                 <div className="flex items-center space-x-2 ml-4">
                   {!semester.isCurrent && (
-                    <button
+                        <button type="button"
                       onClick={() => handleActivate(semester._id)}
                       className="text-green-600 hover:text-green-900 text-sm font-medium"
                     >

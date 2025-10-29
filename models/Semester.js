@@ -4,8 +4,7 @@ const SemesterSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        trim: true,
-        unique: true
+        trim: true
     },
     code: {
         type: String,

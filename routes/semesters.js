@@ -87,6 +87,14 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
+    const { code } = req.body;
+
+    // Kiểm tra xem mã học kỳ đã tồn tại chưa
+    const existingSemester = await Semester.findOne({ code });
+    if (existingSemester) {
+      return res.status(400).json({ message: `Mã học kỳ "${code}" đã tồn tại.` });
+    }
+
     const { registrationStartDate, endDate } = req.body;
     const now = new Date();
     const regStartDate = new Date(registrationStartDate);
