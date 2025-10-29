@@ -23,7 +23,7 @@ router.get('/', [auth, admin], async (req, res) => {
         }
 
         const logs = await ActivityLog.find(filter)
-            .populate('user', 'firstName lastName email')
+            .populate('user', 'firstName lastName email role')
             .sort({ createdAt: -1 })
             .limit(limit * 1)
             .skip((page - 1) * limit)
