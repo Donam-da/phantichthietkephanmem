@@ -64,10 +64,8 @@ Một ứng dụng web hiện đại giúp quản lý quy trình đăng ký họ
 git clone [URL_REPOSITORY_CỦA_BẠN]
 cd phantichthietkephanmem
 
-# Xóa dữ liệu cũ và seed tài khoản mặc định cho admin
+# Xóa toàn bộ dữ liệu cũ và seed tài khoản mặc định cho admin. Chạy lệnh dưới đây ở phần backend
 npm run seed  
-#hoặc 
-node scripts/clearAndSeedAdmin.js
 
 #tải xuống và cài đặt hai gói csv-parser và multer(import từ tệp csv hoặc notepad)
 
@@ -79,7 +77,12 @@ npm install bcryptjs
 # Cài đặt dependencies cho Backend
 npm install
 
+# Khởi động backend
+npm run dev
+
 # Cài đặt dependencies cho Frontend
 cd client
 npm install
-cd ..
+
+# Khơi động chương trình( khởi đọng frontend)
+npm start
