@@ -10,7 +10,7 @@
     "build": "cd client && npm run build",
     "install-client": "cd client && npm install",
     "heroku-postbuild": "npm run install-client && npm run build",
-    "seed": "node scripts/clearAndSeedAdmin.js",
+    "seed": "node scripts/clearAndSeed.js",
     "fix:index": "node scripts/fixCourseIndex.js",
     "fix:classroom-index": "node scripts/fixClassroomIndex.js"
   },
@@ -25,7 +25,7 @@
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "^16.4.5",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "express-validator": "^7.2.1",

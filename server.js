@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+// Chỉ định rõ đường dẫn đến file config.env
 require('dotenv').config({ path: './config.env' });
 const classroomScheduler = require('./services/classroomScheduler');
 const path = require('path');
