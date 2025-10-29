@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Bell, User, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, User, LogOut, ChevronDown, Clock } from 'lucide-react';
 import api from '../services/api';
+import RealTimeClock from './RealTimeClock'; // Import đồng hồ
 
 const Header = () => {
     const { user, logout, isAdmin } = useAuth();
@@ -39,7 +40,8 @@ const Header = () => {
         <header className="bg-transparent w-full">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-end items-center h-16">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-1 items-center justify-end space-x-4">
+                        <RealTimeClock />
                         {isAdmin && (
                             <Link to="/admin/requests" className="relative p-2 rounded-full text-yellow-500 hover:bg-yellow-100 hover:text-yellow-600 transition-colors">
                                 <Bell className="h-6 w-6" fill="currentColor" />
