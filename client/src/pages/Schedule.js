@@ -19,13 +19,14 @@ const Schedule = () => {
         { id: 5, name: 'Thứ 5' },
         { id: 6, name: 'Thứ 6' },
         { id: 7, name: 'Thứ 7' },
+        { id: 8, name: 'Chủ Nhật' },
     ];
 
     const periods = [
-        { id: 1, time: 'Ca 1 (6h45-9h25)' },
-        { id: 2, time: 'Ca 2 (9h40-12h10)' },
-        { id: 3, time: 'Ca 3 (13h-15h30)' },
-        { id: 4, time: 'Ca 4 (15h45-18h25)' },
+        { id: 1, name: 'Ca 1', time: '(6h45-9h25)' },
+        { id: 2, name: 'Ca 2', time: '(9h40-12h10)' },
+        { id: 3, name: 'Ca 3', time: '(13h-15h30)' },
+        { id: 4, name: 'Ca 4', time: '(15h45-18h25)' },
     ];
 
     // Hàm để lấy ngày bắt đầu của tuần (Thứ 2)
@@ -40,13 +41,13 @@ const Schedule = () => {
         if (!currentSemester) return; // Đợi có thông tin học kỳ
         const startOfWeek = getStartOfWeek(currentWeekStart);
         const weekDays = []; // Giữ lại dòng này
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 7; i++) {
             const day = new Date(startOfWeek);
             day.setDate(startOfWeek.getDate() + i);
             weekDays.push({
-                id: i + 2, // 2 for Monday, 3 for Tuesday, etc.
-                name: `Thứ ${i + 2}`,
-                dateString: day.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+                id: i === 6 ? 8 : i + 2, // 2 for Mon, ..., 7 for Sat, 8 for Sun
+                name: i === 6 ? 'Chủ Nhật' : `Thứ ${i + 2}`,
+                dateString: day.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }).replace(/-/g, '/'),
                 dateObject: day,
             });
         }
@@ -225,7 +226,7 @@ const Schedule = () => {
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px] border-b border-gray-200">Ca học</th>
                                     {displayDays.map(day => (
-                                        <th key={day.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[160px]">
+                                        <th key={day.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px]">
                                             <div>{day.name}</div>
                                             <div className="font-normal normal-case text-gray-600">({day.dateString})</div>
                                         </th>
@@ -235,10 +236,13 @@ const Schedule = () => {
                             <tbody className="bg-white">
                                 {periods.map(period => (
                                     <tr key={period.id} className="border-b border-gray-200">
-                                        <td className="px-4 py-4 align-top text-sm font-medium text-gray-900 border-r border-gray-200">
+                                        <td className="px-4 py-4 align-middle text-sm font-medium text-gray-900 border-r border-gray-200 min-w-[200px]">
                                             <div className="flex items-center">
-                                                <Clock className="h-4 w-4 mr-2 text-blue-500" />
-                                                {period.time}
+                                                <Clock className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />
+                                                <div>
+                                                    <div>{period.name}</div>
+                                                    <div className="text-xs text-gray-500 whitespace-nowrap">{period.time}</div>
+                                                </div>
                                             </div>
                                         </td>
                                         {displayDays.map(day => {
@@ -251,7 +255,7 @@ const Schedule = () => {
                                                 day.dateObject <= new Date(new Date(currentSemester.endDate).setHours(23, 59, 59, 999));
 
                                             return (
-                                                <td key={key} className="px-2 py-2 align-top text-xs border-r border-gray-200 min-w-[160px]">
+                                                <td key={key} className="px-2 py-2 align-top text-xs border-r border-gray-200 min-w-[200px]">
                                                     {isWithinSemester && slots.length > 0 ? ( // Giữ lại dòng này
                                                         <div className="space-y-2">
                                                             {slots.map((slot, index) => (
