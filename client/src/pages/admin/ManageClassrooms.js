@@ -330,6 +330,7 @@ const ManageClassrooms = () => {
                                 <th className="px-6 py-3 text-left">
                                     <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                                 </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">STT</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã phòng</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thông tin</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lịch khóa phòng</th>
@@ -337,11 +338,12 @@ const ManageClassrooms = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {classrooms.map((room) => (
+                            {classrooms.map((room, index) => (
                                 <tr key={room._id} onDoubleClick={() => openModal(room)} className={`hover:bg-gray-50 cursor-pointer ${selectedClassrooms.includes(room._id) ? 'bg-blue-50' : ''}`}>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <input type="checkbox" checked={selectedClassrooms.includes(room._id)} onChange={() => handleSelectClassroom(room._id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">{room.roomCode}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         Loại: {roomTypeNames[room.roomType] || room.roomType} - Sức chứa: {room.capacity}
