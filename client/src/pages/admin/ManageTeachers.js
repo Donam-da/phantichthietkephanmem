@@ -38,7 +38,11 @@ const ManageTeachers = () => {
         setIsLoading(true);
         try {
             const res = await axios.get('/api/users?role=teacher&populateSchools=true', getAuthHeaders());
-            setTeachers(res.data.users);
+            // Sắp xếp giảng viên theo số lớp được phân công giảm dần
+            const sortedTeachers = res.data.users.sort((a, b) => {
+                return (b.assignedCourseCount ?? 0) - (a.assignedCourseCount ?? 0);
+            });
+            setTeachers(sortedTeachers);
         } catch (error) {
             toast.error('Không thể tải danh sách giảng viên.');
             console.error(error);
@@ -102,9 +106,9 @@ const ManageTeachers = () => {
                 firstName: teacher.firstName,
                 lastName: teacher.lastName,
                 email: teacher.email,
-                isActive: teacher.isActive,
+                isActive: teacher.isActive ?? true,
                 password: '', // Luôn để trống mật khẩu
-                teachingSchools: teacher.teachingSchools.map(s => s._id), // NEW: Populate teachingSchools
+                teachingSchools: teacher.teachingSchools?.filter(s => s).map(s => s._id) || [], // NEW: Populate teachingSchools, safely handle nulls
             });
         } else {
             setFormData({ firstName: '', lastName: '', email: '', password: '', isActive: true, teachingSchools: [] }); // NEW: Reset teachingSchools
@@ -318,6 +322,7 @@ const ManageTeachers = () => {
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Họ và tên</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Email</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Trường giảng dạy</th> {/* NEW: Column for teaching schools */}
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Số lớp được phân công</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Trạng thái</th>
                                 </tr>
                             </thead>
@@ -334,8 +339,11 @@ const ManageTeachers = () => {
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center cursor-pointer">{teacher.email}</td>
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center cursor-pointer">
                                             {teacher.teachingSchools && teacher.teachingSchools.length > 0
-                                                ? teacher.teachingSchools.map(s => s.schoolCode).join(', ')
+                                                ? teacher.teachingSchools.filter(s => s).map(s => s.schoolCode).join(', ')
                                                 : 'N/A'}
+                                        </td>
+                                        <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center cursor-pointer">
+                                            {teacher.assignedCourseCount ?? 0}
                                         </td> {/* NEW: Display teaching schools */}
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-center cursor-pointer">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${teacher.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

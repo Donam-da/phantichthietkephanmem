@@ -188,6 +188,7 @@ const UserManagement = () => {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider w-16">STT</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Thông tin người dùng</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Vai trò</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Phân công / Trường</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Trạng thái</th>
               <th scope="col" className="relative px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider"><span className="sr-only">Hành động</span></th>
             </tr>
@@ -224,6 +225,17 @@ const UserManagement = () => {
                     {userItem.role === 'admin' ? 'Quản trị viên' :
                       userItem.role === 'teacher' ? 'Giảng viên' : 'Sinh viên'}
                   </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {userItem.role === 'teacher' && (
+                    <span>Số môn đã dạy: <strong>{userItem.assignedCourseCount}</strong></span>
+                  )}
+                  {userItem.role === 'student' && (
+                    <span>{userItem.school?.schoolName || 'Chưa có trường'}</span>
+                  )}
+                  {userItem.role === 'admin' && (
+                    <span>-</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button

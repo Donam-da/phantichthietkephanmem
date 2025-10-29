@@ -92,20 +92,60 @@ router.post('/', [
 // @access  Private (Admin)
 router.get('/', [auth, admin], async (req, res) => {
     try {
-        const { role, populateSchools } = req.query; // NEW: Get populateSchools query param
+        const { role, populateSchools } = req.query;
         const query = {};
         if (role) {
             query.role = role;
         }
-        let usersQuery = User.find(query);
-        if (populateSchools === 'true') { // NEW: Conditionally populate teachingSchools
-            usersQuery = usersQuery.populate('teachingSchools', 'schoolCode schoolName');
-        }
-        const users = await usersQuery
-            .select('-password')
-            .populate('school', 'schoolName')
-            // Sắp xếp: tài khoản vô hiệu hóa (isActive: false) lên đầu, sau đó sắp xếp theo tên
-            .sort({ isActive: 1, lastName: 1, firstName: 1 });
+
+        // Sử dụng aggregation để đếm số lớp học phần được phân công cho giảng viên
+        const aggregationPipeline = [
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'courses', // Tên collection của Course model
+                    localField: '_id',
+                    foreignField: 'teacher',
+                    as: 'assignedCourses'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'schools', // Tên collection của School model
+                    localField: 'school',
+                    foreignField: '_id',
+                    as: 'schoolInfo'
+                }
+            },
+            // Thêm bước lookup để populate teachingSchools cho giảng viên
+            {
+                $lookup: {
+                    from: 'schools',
+                    localField: 'teachingSchools',
+                    foreignField: '_id',
+                    as: 'teachingSchoolsInfo'
+                }
+            },
+            {
+                $addFields: {
+                    assignedCourseCount: { $size: '$assignedCourses' },
+                    school: { $arrayElemAt: ['$schoolInfo', 0] },
+                    teachingSchools: '$teachingSchoolsInfo' // Ghi đè mảng ID bằng mảng object đã populate
+                }
+            },
+            {
+                $project: {
+                    password: 0,
+                    assignedCourses: 0,
+                    schoolInfo: 0,
+                    teachingSchoolsInfo: 0 // Xóa trường tạm
+                }
+            },
+            { $sort: { isActive: 1, lastName: 1, firstName: 1 } }
+        ];
+
+        const users = await User.aggregate(aggregationPipeline);
+
         res.json({ users });
     } catch (err) {
         console.error(err.message);

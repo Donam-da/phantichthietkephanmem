@@ -220,7 +220,7 @@ const Profile = () => {
           <div className="bg-white rounded-lg shadow-sm">
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">Thông tin cá nhân</h3>
+                <h3 className="text-lg font-medium text-red-700">Thông tin cá nhân</h3>
                 {!isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -266,7 +266,7 @@ const Profile = () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="form-label">Họ và tên đệm</label>
+                      <label className="form-label text-blue-700">Họ và tên đệm</label>
                       <input
                         type="text"
                         {...register('firstName', { required: 'Họ và tên đệm là bắt buộc' })}
@@ -278,7 +278,7 @@ const Profile = () => {
                     </div>
 
                     <div>
-                      <label className="form-label">Tên</label>
+                      <label className="form-label text-blue-700">Tên</label>
                       <input
                         type="text"
                         {...register('lastName', { required: 'Tên là bắt buộc' })}
@@ -290,7 +290,7 @@ const Profile = () => {
                     </div>
 
                     <div>
-                      <label className="form-label">Email</label>
+                      <label className="form-label text-blue-700">Email</label>
                       <input
                         type="email"
                         {...register('email', { 
@@ -308,7 +308,7 @@ const Profile = () => {
                     </div>
 
                     <div>
-                      <label className="form-label">Số điện thoại</label>
+                      <label className="form-label text-blue-700">Số điện thoại</label>
                       <input
                         type="tel"
                         {...register('phone')}
@@ -318,7 +318,7 @@ const Profile = () => {
                     </div>
 
                     <div>
-                      <label className="form-label">Ngày sinh</label>
+                      <label className="form-label text-blue-700">Ngày sinh</label>
                       <input
                         type="date"
                         {...register('dateOfBirth')}
@@ -327,7 +327,7 @@ const Profile = () => {
                     </div>
 
                     <div>
-                      <label className="form-label">Giới tính</label>
+                      <label className="form-label text-blue-700">Giới tính</label>
                       <select {...register('gender')} className="input-field">
                         <option value="">Chọn giới tính</option>
                         <option value="male">Nam</option>
@@ -338,7 +338,7 @@ const Profile = () => {
 
                     {user.role === 'student' && (
                       <div>
-                        <label className="form-label">Trường</label>
+                        <label className="form-label text-blue-700">Trường</label>
                         <select 
                           {...register('school')} 
                           className="input-field"
@@ -357,7 +357,7 @@ const Profile = () => {
                     {user.role === 'student' && (
                       <>
                         <div>
-                          <label className="form-label">Năm học</label>
+                          <label className="form-label text-blue-700">Năm học</label>
                           <select {...register('year', { valueAsNumber: true })} className="input-field">
                             <option value="" disabled>Chọn năm học</option>
                             {[1, 2, 3, 4, 5].map(y => (
@@ -366,7 +366,7 @@ const Profile = () => {
                           </select>
                         </div>
                         <div>
-                          <label className="form-label">Học kỳ</label>
+                          <label className="form-label text-blue-700">Học kỳ</label>
                           <select {...register('semester', { valueAsNumber: true })} className="input-field">
                             <option value="" disabled>Chọn học kỳ</option>
                             {activeSemesters.map(s => (
@@ -379,7 +379,7 @@ const Profile = () => {
                   </div>
 
                   <div>
-                    <label className="form-label">Địa chỉ</label>
+                    <label className="form-label text-blue-700">Địa chỉ</label>
                     <textarea
                       {...register('address')}
                       rows={3}
@@ -409,27 +409,27 @@ const Profile = () => {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="form-label">Họ và tên đệm</label>
+                      <label className="form-label text-blue-700">Họ và tên đệm</label>
                       <p className="text-gray-900">{user.firstName || 'Chưa cập nhật'}</p>
                     </div>
 
                     <div>
-                      <label className="form-label">Tên</label>
+                      <label className="form-label text-blue-700">Tên</label>
                       <p className="text-gray-900">{user.lastName || 'Chưa cập nhật'}</p>
                     </div>
 
                     <div>
-                      <label className="form-label">Email</label>
+                      <label className="form-label text-blue-700">Email</label>
                       <p className="text-gray-900">{user.email}</p>
                     </div>
 
                     <div>
-                      <label className="form-label">Số điện thoại</label>
+                      <label className="form-label text-blue-700">Số điện thoại</label>
                       <p className="text-gray-900">{user.phone || 'Chưa cập nhật'}</p>
                     </div>
 
                     <div>
-                      <label className="form-label">Ngày sinh</label>
+                      <label className="form-label text-blue-700">Ngày sinh</label>
                       <p className="text-gray-900">
                         {user.dateOfBirth 
                           ? new Date(user.dateOfBirth).toLocaleDateString('vi-VN')
@@ -439,19 +439,19 @@ const Profile = () => {
                     </div>
 
                     <div>
-                      <label className="form-label">Giới tính</label>
+                      <label className="form-label text-blue-700">Giới tính</label>
                       <p className="text-gray-900">{getGenderDisplayName(user.gender)}</p>
                     </div>
                   </div>
                   {user.role === 'student' && (
                     <div>
-                      <label className="form-label">Trường</label>
+                      <label className="form-label text-blue-700">Trường</label>
                       <p className="text-gray-900">{user.school?.schoolName || 'Chưa cập nhật'}</p>
                     </div>
                   )}
 
                   <div>
-                    <label className="form-label">Địa chỉ</label>
+                    <label className="form-label text-blue-700">Địa chỉ</label>
                     <p className="text-gray-900">{user.address || 'Chưa cập nhật'}</p>
                   </div>
                 </div>

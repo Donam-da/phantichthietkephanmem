@@ -668,6 +668,9 @@ const CourseManagement = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {editingCourse ? 'Chỉnh sửa Lớp học phần' : 'Thêm Lớp học phần mới'}
               </h3>
+              <p className="text-xs text-gray-500 mb-4 -mt-2">
+                <span className="font-semibold text-red-600">Chú thích:</span> <span className="text-yellow-500 font-bold">*</span> là số lớp học phần đã được phân công.
+              </p>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -715,7 +718,11 @@ const CourseManagement = () => {
                   <label className="block text-sm font-medium text-gray-700">Giảng viên</label>
                   <select value={formData.teacher} onChange={(e) => setFormData({ ...formData, teacher: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Tạm thời chưa có giảng viên</option>
-                    {filteredTeachersForSubject.map(t => <option key={t._id} value={t._id}>{t.firstName} {t.lastName}</option>)}
+                    {filteredTeachersForSubject.map(t => (
+                      <option key={t._id} value={t._id}> 
+                        {t.firstName} {t.lastName} ({t.assignedCourseCount ?? 0}*)
+                      </option>
+                    ))}
                   </select>
                   {editingCourse && (
                     <div className="mt-2 flex items-center">

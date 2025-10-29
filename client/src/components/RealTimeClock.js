@@ -69,7 +69,7 @@ const RealTimeClock = () => {
           x="50"
           y="26"
           fill="#2408f2ff"
-          fontSize="8"
+          fontSize="12"
           fontWeight="bold"
           textAnchor="middle"
           dominantBaseline="middle"
@@ -83,7 +83,7 @@ const RealTimeClock = () => {
           x="25"
           y="50"
           fill="#374151"
-          fontSize="8"
+          fontSize="12"
           fontWeight="bold"
           textAnchor="middle"
           dominantBaseline="middle"
@@ -97,7 +97,7 @@ const RealTimeClock = () => {
           x="75"
           y="50"
           fill="#374151" // Darker color for minutes
-          fontSize="8"
+          fontSize="12"
           fontWeight="bold"
           textAnchor="middle"
           dominantBaseline="middle"
@@ -110,8 +110,8 @@ const RealTimeClock = () => {
         <text
           x="50"
           y="74"
-          fill="#ef4444" // Màu đỏ giống kim giây
-          fontSize="8"
+          fill="#00ff80ff" // Màu đỏ giống kim giây
+          fontSize="12"
           fontWeight="bold"
           textAnchor="middle"
           dominantBaseline="middle"
