@@ -31,6 +31,17 @@ const AdminDashboard = () => {
   const [recentRegistrations, setRecentRegistrations] = useState([]);
   const [recentUsers, setRecentUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [systemStatus, setSystemStatus] = useState({
+    database: { ok: false, message: 'Đang kiểm tra...' },
+    api: { ok: false, message: 'Đang kiểm tra...' }
+  });
+
+  const fetchSystemStatus = async () => {
+    try {
+      const res = await api.get('/api/health/status');
+      setSystemStatus(res.data);
+    } catch (error) { toast.error('Không thể kiểm tra trạng thái hệ thống.'); }
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -41,12 +52,13 @@ const AdminDashboard = () => {
       setLoading(true);
       
       // Fetch all data in parallel
-      const [usersRes, coursesRes, registrationsRes, semestersRes, changeRequestsRes] = await Promise.all([
+      const [usersRes, coursesRes, registrationsRes, semestersRes, changeRequestsRes, statusRes] = await Promise.all([
         api.get('/api/users'),
         api.get('/api/courses'),
         api.get('/api/registrations'),
         api.get('/api/semesters'),
         api.get('/api/change-requests'),
+        api.get('/api/health/status') // Thêm API kiểm tra trạng thái
       ]);
 
       const users = usersRes.data.users;
@@ -54,6 +66,7 @@ const AdminDashboard = () => {
       const registrations = registrationsRes.data.registrations;
       const semesters = semestersRes.data;
       const changeRequests = changeRequestsRes.data;
+      setSystemStatus(statusRes.data); // Cập nhật trạng thái hệ thống
 
       // Calculate stats
       const totalStudents = users.filter(u => u.role === 'student').length;
@@ -382,22 +395,26 @@ const AdminDashboard = () => {
 
       {/* System Status */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Trạng thái hệ thống</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <CheckCircle className="mx-auto h-8 w-8 text-green-600 mb-2" />
-            <p className="text-sm font-medium text-green-900">Hệ thống hoạt động</p>
-            <p className="text-xs text-gray-500">Tất cả dịch vụ đang chạy</p>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Trạng thái hệ thống</h3>
+          <button onClick={fetchSystemStatus} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors">
+            <TrendingUp className="h-5 w-5 text-gray-500" />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className={`w-3 h-3 rounded-full mr-3 ${systemStatus.api.ok ? 'bg-green-400' : 'bg-red-400'}`}></div>
+              <span className="text-sm text-gray-700">API Services</span>
+            </div>
+            <span className={`text-sm font-medium ${systemStatus.api.ok ? 'text-green-600' : 'text-red-600'}`}>{systemStatus.api.message}</span>
           </div>
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <TrendingUp className="mx-auto h-8 w-8 text-blue-600 mb-2" />
-            <p className="text-sm font-medium text-blue-900">Hiệu suất tốt</p>
-            <p className="text-xs text-gray-500">Phản hồi nhanh</p>
-          </div>
-          <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <ShieldCheck className="mx-auto h-8 w-8 text-gray-600 mb-2" />
-            <p className="text-sm font-medium text-gray-900">Bảo mật</p>
-            <p className="text-xs text-gray-500">Hệ thống được bảo vệ</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className={`w-3 h-3 rounded-full mr-3 ${systemStatus.database.ok ? 'bg-green-400' : 'bg-red-400'}`}></div>
+              <span className="text-sm text-gray-700">Cơ sở dữ liệu</span>
+            </div>
+            <span className={`text-sm font-medium ${systemStatus.database.ok ? 'text-green-600' : 'text-red-600'}`}>{systemStatus.database.message}</span>
           </div>
         </div>
       </div>

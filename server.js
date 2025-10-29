@@ -44,6 +44,7 @@ app.use('/api/schools', require('./routes/schools'));
 app.use('/api/classrooms', require('./routes/classrooms'));
 app.use('/api/subjects', require('./routes/subjects'));
 app.use('/api/change-requests', require('./routes/changeRequests'));
+app.use('/api/health', require('./routes/health'));
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
