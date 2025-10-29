@@ -314,6 +314,7 @@ const ManageTeachers = () => {
                                             checked={isAllSelected}
                                         />
                                     </th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">STT</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Họ và tên</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Email</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Trường giảng dạy</th> {/* NEW: Column for teaching schools */}
@@ -321,10 +322,13 @@ const ManageTeachers = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredTeachers.map((teacher) => (
+                                {filteredTeachers.map((teacher, index) => (
                                     <tr key={teacher._id} className={`hover:bg-gray-50 ${selectedTeachers.includes(teacher._id) ? 'bg-blue-50' : ''}`}>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <input type="checkbox" className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked={selectedTeachers.includes(teacher._id)} onChange={() => handleSelectTeacher(teacher._id)} />
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                            {index + 1}
                                         </td>
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center cursor-pointer">{teacher.firstName} {teacher.lastName}</td>
                                         <td onDoubleClick={() => openModal(teacher)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center cursor-pointer">{teacher.email}</td>
