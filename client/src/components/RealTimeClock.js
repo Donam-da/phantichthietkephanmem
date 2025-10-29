@@ -17,6 +17,12 @@ const RealTimeClock = () => {
   const minutesAngle = minutes * 6 + seconds * 0.1;
   const hoursAngle = (hours % 12) * 30 + minutes * 0.5;
 
+  // Định dạng ngày tháng theo dd/MM/yy
+  const day = String(time.getDate()).padStart(2, '0');
+  const month = String(time.getMonth() + 1).padStart(2, '0');
+  const year = String(time.getFullYear()).slice(-2);
+  const dateString = `${day}/${month}/${year}`;
+
   // Tạo các số từ 1 đến 12
   const numbers = Array.from({ length: 12 }, (_, i) => {
     const num = i + 1;
@@ -47,6 +53,19 @@ const RealTimeClock = () => {
 
         {/* Các số trên mặt đồng hồ */}
         {numbers}
+
+        {/* Khung hiển thị ngày tháng */}
+        <rect x="38" y="64" width="24" height="12" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="0.5" rx="1" />
+        <text
+          x="50"
+          y="70"
+          fill="#2408f2ff"
+          fontSize="8"
+          fontWeight="bold"
+          textAnchor="middle"
+        >
+          {dateString}
+        </text>
 
         {/* Kim giờ */}
         <line
