@@ -182,29 +182,41 @@ const UserManagement = () => {
       </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <ul className="divide-y divide-gray-200">
-          {filteredUsers.map((userItem) => (
-            <li key={userItem._id} className="px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 h-10 w-10">
-                    <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                      <span className="text-white font-medium">
-                        {userItem.firstName?.charAt(0)}{userItem.lastName?.charAt(0)}
-                      </span>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">STT</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thông tin người dùng</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vai trò</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+              <th scope="col" className="relative px-6 py-3"><span className="sr-only">Hành động</span></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredUsers.map((userItem, index) => (
+              <tr key={userItem._id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-10 w-10">
+                      <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                        <span className="text-white font-medium">
+                          {userItem.firstName?.charAt(0)}{userItem.lastName?.charAt(0)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-gray-900">
+                        {userItem.firstName} {userItem.lastName}
+                      </div>
+                      <div className="text-sm text-gray-500">{userItem.email}</div>
+                      <div className="text-sm text-gray-500">
+                        {userItem.studentId && `MSSV: ${userItem.studentId}`}
+                      </div>
                     </div>
                   </div>
-                  <div className="ml-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {userItem.firstName} {userItem.lastName}
-                    </div>
-                    <div className="text-sm text-gray-500">{userItem.email}</div>
-                    <div className="text-sm text-gray-500">
-                      {userItem.studentId && `MSSV: ${userItem.studentId}`}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${userItem.role === 'admin' ? 'bg-red-100 text-red-800' :
                     userItem.role === 'teacher' ? 'bg-blue-100 text-blue-800' :
                       'bg-green-100 text-green-800'
@@ -212,14 +224,8 @@ const UserManagement = () => {
                     {userItem.role === 'admin' ? 'Quản trị viên' :
                       userItem.role === 'teacher' ? 'Giảng viên' : 'Sinh viên'}
                   </span>
-                  {userItem.role === 'student' && (
-                    <button
-                      onClick={() => openStudentDetail(userItem._id)}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
-                    >
-                      Chi tiết
-                    </button>
-                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     onClick={() => handleToggleActive(userItem._id, userItem.isActive)}
                     className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${userItem.isActive
@@ -229,11 +235,21 @@ const UserManagement = () => {
                   >
                     {userItem.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}
                   </button>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  {userItem.role === 'student' && (
+                    <button
+                      onClick={() => openStudentDetail(userItem._id)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      Chi tiết
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Create User Modal */}
