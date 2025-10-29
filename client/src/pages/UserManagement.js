@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import ConfirmPasswordModal from '../components/ConfirmPasswordModal';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -15,6 +16,9 @@ const UserManagement = () => {
   const [schools, setSchools] = useState([]);
   const [createFormData, setCreateFormData] = useState({ role: 'student', firstName: '', lastName: '', email: '', password: '', school: '', studentId: '', year: '', semester: '' });
   const [activeSemesters, setActiveSemesters] = useState([]);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -26,10 +30,17 @@ const UserManagement = () => {
     try {
       const response = await api.get('/api/users');
       // Sắp xếp người dùng theo vai trò: admin > teacher > student
-      const sortedUsers = response.data.users.sort((a, b) => {
+      const sortedUsers = (response.data.users || []).sort((a, b) => {
         const roleOrder = { admin: 1, teacher: 2, student: 3 };
         const roleA = roleOrder[a.role] || 4;
         const roleB = roleOrder[b.role] || 4;
+
+        // Nếu cả hai đều là giảng viên, sắp xếp theo số lớp được phân công
+        if (a.role === 'teacher' && b.role === 'teacher') {
+          return (b.assignedCourseCount ?? 0) - (a.assignedCourseCount ?? 0);
+        }
+
+        // Sắp xếp theo vai trò
         if (roleA !== roleB) {
           return roleA - roleB;
         }
@@ -134,6 +145,32 @@ const UserManagement = () => {
     }
   };
 
+  const handleDeleteUser = (user) => {
+    if (!user) return;
+    setConfirmAction(() => (password) => executeDelete(user._id, password));
+    setIsConfirmModalOpen(true);
+  };
+
+  const executeDelete = async (userId, password) => {
+    setIsConfirming(true);
+    const toastId = toast.loading('Đang xóa người dùng...');
+    try {
+      // Giả sử API xóa người dùng yêu cầu mật khẩu của admin để xác nhận
+      await api.delete(`/api/users/${userId}`, { data: { password } });
+      toast.success('Xóa người dùng thành công!', { id: toastId });
+      closeDetailModal(); // Đóng modal chi tiết sau khi xóa
+      fetchUsers(); // Tải lại danh sách người dùng
+    } catch (error) {
+      toast.error(error.response?.data?.msg || 'Xóa thất bại.', { id: toastId });
+    } finally {
+      setIsConfirming(false);
+      setIsConfirmModalOpen(false);
+    }
+  };
+
+  const handleRowDoubleClick = (user) => {
+    if (user.role === 'student') openStudentDetail(user._id);
+  };
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -195,7 +232,7 @@ const UserManagement = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredUsers.map((userItem, index) => (
-              <tr key={userItem._id}>
+              <tr key={userItem._id} onDoubleClick={() => handleRowDoubleClick(userItem)} className={userItem.role === 'student' ? 'cursor-pointer hover:bg-gray-50' : ''}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -228,7 +265,9 @@ const UserManagement = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {userItem.role === 'teacher' && (
-                    <span>Số môn đã dạy: <strong>{userItem.assignedCourseCount}</strong></span>
+                    <span>
+                      {userItem.assignedCourseCount ?? 0}/{userItem.teachingSchools?.map(s => s.schoolCode).join(', ') || 'N/A'}
+                    </span>
                   )}
                   {userItem.role === 'student' && (
                     <span>{userItem.school?.schoolName || 'Chưa có trường'}</span>
@@ -248,16 +287,6 @@ const UserManagement = () => {
                     {userItem.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}
                   </button>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {userItem.role === 'student' && (
-                    <button
-                      onClick={() => openStudentDetail(userItem._id)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      Chi tiết
-                    </button>
-                  )}
-                </td>
               </tr>
             ))}
           </tbody>
@@ -267,17 +296,9 @@ const UserManagement = () => {
       {/* Create User Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Tạo người dùng mới</h3>
+          <div className="relative top-10 mx-auto p-6 border w-full max-w-lg shadow-lg rounded-xl bg-white">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Tạo tài khoản Sinh viên mới</h3>
             <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
-                <label className="form-label">Vai trò</label>
-                <select name="role" value={createFormData.role} onChange={handleCreateFormChange} className="input-field">
-                  <option value="student">Sinh viên</option>
-                  <option value="teacher">Giảng viên</option>
-                  <option value="admin">Quản trị viên</option>
-                </select>
-              </div>
               <div>
                 <label className="form-label">Họ và tên</label>
                 <input type="text" name="fullName" value={createFormData.fullName} onChange={handleCreateFormChange} className="input-field" required />
@@ -290,37 +311,35 @@ const UserManagement = () => {
                 <label className="form-label">Mật khẩu</label>
                 <input type="password" name="password" value={createFormData.password} onChange={handleCreateFormChange} className="input-field" required />
               </div>
-              {createFormData.role === 'student' && (
-                <>
-                  <div>
-                    <label className="form-label">Mã sinh viên</label>
-                    <input type="text" name="studentId" value={createFormData.studentId} onChange={handleCreateFormChange} className="input-field" required />
-                  </div>
-                  <div>
-                    <label className="form-label">Trường</label>
-                    <select name="school" value={createFormData.school} onChange={handleCreateFormChange} className="input-field" required>
-                      <option value="">Chọn trường</option>
-                      {schools.map(s => <option key={s._id} value={s._id}>{s.schoolName}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Học kỳ nhập học</label>
-                    <select
-                      name="semesterSelection" // Tên mới cho dropdown
-                      onChange={handleSemesterSelectionChange}
-                      className="input-field"
-                      required
-                    >
-                      <option value="">Chọn học kỳ</option>
-                      {activeSemesters.map(s => (
-                        <option key={s._id} value={s._id}>
-                          {s.name} ({s.academicYear})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
+              <>
+                <div>
+                  <label className="form-label">Mã sinh viên</label>
+                  <input type="text" name="studentId" value={createFormData.studentId} onChange={handleCreateFormChange} className="input-field" required />
+                </div>
+                <div>
+                  <label className="form-label">Trường</label>
+                  <select name="school" value={createFormData.school} onChange={handleCreateFormChange} className="input-field" required>
+                    <option value="">Chọn trường</option>
+                    {schools.map(s => <option key={s._id} value={s._id}>{s.schoolName}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Học kỳ nhập học</label>
+                  <select
+                    name="semesterSelection" // Tên mới cho dropdown
+                    onChange={handleSemesterSelectionChange}
+                    className="input-field"
+                    required
+                  >
+                    <option value="">Chọn học kỳ</option>
+                    {activeSemesters.map(s => (
+                      <option key={s._id} value={s._id}>
+                        {s.name} ({s.academicYear})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
               <div className="flex justify-end space-x-2 pt-4">
                 <button
                   type="button"
@@ -420,12 +439,29 @@ const UserManagement = () => {
                 <p className="text-sm text-gray-600">Không có dữ liệu sinh viên.</p>
               )}
             </div>
-            <div className="mt-6 flex justify-end">
-              <button onClick={closeDetailModal} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">Đóng</button>
+            <div className="mt-6 flex justify-between items-center">
+              {selectedUser && (
+                <button
+                  onClick={() => handleDeleteUser(selectedUser)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all"
+                >
+                  <Trash2 size={16} /> Xóa tài khoản
+                </button>
+              )}
+              <button onClick={closeDetailModal} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Đóng</button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmPasswordModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={confirmAction}
+        title="Xác nhận xóa người dùng"
+        message="Hành động này không thể hoàn tác. Vui lòng nhập mật khẩu của bạn để xác nhận."
+        isLoading={isConfirming}
+      />
     </div>
   );
 };

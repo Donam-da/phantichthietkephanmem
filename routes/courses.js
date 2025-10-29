@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Course = require('../models/Course');
 const { auth } = require('../middleware/auth');
+const Registration = require('../models/Registration'); // Import Registration model
 const { admin } = require('../middleware/admin');
 const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 
@@ -258,6 +259,36 @@ router.post('/sync-teacher-status', [auth, admin], async (req, res) => {
     } catch (error) {
         console.error('Error syncing course status:', error.message);
         res.status(500).json({ msg: 'Lỗi Server khi đồng bộ hóa trạng thái lớp học phần.' });
+    }
+});
+
+// @route   POST /api/courses/sync-counts
+// @desc    Recalculate and sync currentStudents for all courses
+// @access  Private (Admin only)
+router.post('/sync-counts', [auth, admin], async (req, res) => {
+    try {
+        const courses = await Course.find({});
+        let updatedCount = 0;
+
+        for (const course of courses) {
+            // Đếm số lượng đăng ký đã được duyệt cho mỗi lớp học
+            const approvedRegistrationsCount = await Registration.countDocuments({
+                course: course._id,
+                status: 'approved'
+            });
+
+            // Nếu sĩ số hiện tại khác với số lượng đã đếm, cập nhật lại
+            if (course.currentStudents !== approvedRegistrationsCount) {
+                course.currentStudents = approvedRegistrationsCount;
+                await course.save();
+                updatedCount++;
+            }
+        }
+
+        res.json({ message: `Đồng bộ hóa hoàn tất. Đã cập nhật sĩ số cho ${updatedCount} lớp học phần.`, count: updatedCount });
+    } catch (error) {
+        console.error('Error syncing course counts:', error.message);
+        res.status(500).json({ msg: 'Lỗi Server khi đồng bộ hóa sĩ số.' });
     }
 });
 

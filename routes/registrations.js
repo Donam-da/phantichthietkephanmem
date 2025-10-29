@@ -353,13 +353,23 @@ router.post('/switch', [
 
     // --- LOGIC: Handle student count and credits when switching from an approved or pending course ---
     if (oldReg.status === 'approved' || oldReg.status === 'pending') {
-      await Course.findByIdAndUpdate(oldReg.course._id, { $inc: { currentStudents: -1 } });
-      // Decrement student's total credits for the old course
-      await User.findByIdAndUpdate(student._id, { $inc: { currentCredits: -oldReg.course.subject.credits } });
+      // Chỉ giảm sĩ số nếu nó lớn hơn 0
+      await Course.findOneAndUpdate(
+        { _id: oldReg.course._id, currentStudents: { $gt: 0 } },
+        { $inc: { currentStudents: -1 } }
+      );
+      // Không trừ tín chỉ ở đây vì tín chỉ của môn học mới sẽ được cộng vào ngay sau đó,
+      // và về cơ bản là chúng giống nhau (cùng một môn học).
     }
 
-    // 3. Delete the old registration
-    await Registration.findByIdAndDelete(oldRegistrationId);
+    // 3. UPDATE the old registration to point to the new course, instead of deleting and creating
+    oldReg.course = newCourseId;
+    oldReg.status = 'pending'; // Reset status to pending for the new section
+    oldReg.registrationDate = new Date(); // Update registration date
+    oldReg.notes = `Switched from class ${oldReg.course.classCode} on ${new Date().toLocaleString('vi-VN')}`;
+    await oldReg.save();
+
+    res.status(200).json({ message: 'Chuyển lớp thành công!', registration: oldReg });
 
     // 4. Create the new registration
     // The new registration will be 'pending' and won't affect the new course's student count until approved.
@@ -369,12 +379,6 @@ router.post('/switch', [
       semester: oldReg.semester,
       status: 'pending',
     });
-    await newReg.save();
-
-    // Cập nhật tín chỉ cho sinh viên cho lớp mới
-    await User.findByIdAndUpdate(req.user.id, { $inc: { currentCredits: newCourse.subject.credits } });
-
-    res.status(201).json({ message: 'Chuyển lớp thành công!', registration: newReg });
   } catch (error) {
     console.error('Switch course error:', error);
     res.status(500).json({ message: error.message || 'Lỗi khi chuyển lớp.' });
@@ -429,7 +433,10 @@ router.put('/:id/approve', auth, async (req, res) => {
     await registration.save();
 
     // Atomically update course's student count. Credits were already added when registration was pending.
-    await Course.findByIdAndUpdate(registration.course._id, { $inc: { currentStudents: 1 } });
+    // FIX: Increment student count on approval. This was the missing piece.
+    if (registration.status === 'approved' && !registration.isCounted) {
+        await Course.findByIdAndUpdate(registration.course._id, { $inc: { currentStudents: 1 } });
+    }
 
     // Populate fields for response
     await registration.populate([
@@ -566,9 +573,15 @@ router.delete('/:id', auth, async (req, res) => {
 
     // Decrease counts if the registration was approved or pending
     if (registration.status === 'approved' || registration.status === 'pending') {
-      // Update course current students count only if it was approved
-      if (registration.status === 'approved') await Course.findByIdAndUpdate(registration.course._id, { $inc: { currentStudents: -1 } });
-      // Atomically update student's credit count
+      // Chỉ giảm sĩ số nếu đăng ký đã được duyệt.
+      // Nếu nó ở trạng thái 'pending', sĩ số chưa bao giờ được tăng, nên không cần giảm.
+      if (registration.status === 'approved') {
+        await Course.findOneAndUpdate(
+          { _id: registration.course._id, currentStudents: { $gt: 0 } },
+          { $inc: { currentStudents: -1 } }
+        );
+      }
+      // Cập nhật tín chỉ của sinh viên (đúng cho cả 'approved' và 'pending')
       if (registration.course.subject?.credits > 0) await User.findByIdAndUpdate(req.user.id, { $inc: { currentCredits: -registration.course.subject.credits } });
     }
 

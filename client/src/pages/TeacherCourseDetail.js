@@ -131,7 +131,7 @@ const TeacherCourseDetail = () => {
                     </div>
                     <div className="flex items-center">
                         <Users className="h-4 w-4 mr-2 text-purple-500" />
-                        <span>{course.currentStudents}/{course.maxStudents} sinh viên</span>
+                        <span>{Math.max(0, course.currentStudents)}/{course.maxStudents} sinh viên</span>
                     </div>
                     <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-orange-500" />

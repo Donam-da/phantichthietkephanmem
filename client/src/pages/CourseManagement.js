@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Search, Filter, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import ConfirmPasswordModal from '../components/ConfirmPasswordModal';
@@ -25,6 +25,7 @@ const CourseManagement = () => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [filters, setFilters] = useState({
     // ... (filters state remains the same)
     semester: '',
@@ -110,6 +111,11 @@ const CourseManagement = () => {
         setAllSchools(schoolsRes.data); // Lưu danh sách trường
         if (teachersRes) {
           setTeachers(teachersRes.data.users);
+          // Sắp xếp giảng viên theo số lớp được phân công giảm dần
+          const sortedTeachers = (teachersRes.data.users || []).sort((a, b) => {
+            return (b.assignedCourseCount ?? 0) - (a.assignedCourseCount ?? 0);
+          });
+          setTeachers(sortedTeachers);
         }
 
         // Set default semester filter if not set
@@ -669,7 +675,7 @@ const CourseManagement = () => {
                 {editingCourse ? 'Chỉnh sửa Lớp học phần' : 'Thêm Lớp học phần mới'}
               </h3>
               <p className="text-xs text-gray-500 mb-4 -mt-2">
-                <span className="font-semibold text-red-600">Chú thích:</span> <span className="text-yellow-500 font-bold">*</span> là số lớp học phần đã được phân công.
+                <span className="font-semibold text-red-600">Chú thích:</span> Tên giảng viên (số*), với * là số lớp học phần đã được phân công.
               </p>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -1045,7 +1051,7 @@ const CourseManagement = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{course.teacher?.firstName} {course.teacher?.lastName}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{course.schedule.map((s, i) => (<div key={i}>{dayOfWeekNames[s.dayOfWeek]}, {periodNames[s.period]}</div>))}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{course.currentStudents}/{course.maxStudents}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{Math.max(0, course.currentStudents)}/{course.maxStudents}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-center" onMouseEnter={(e) => {
                         if (!course.isActive && course.notes) {
                           e.stopPropagation(); // Ngăn sự kiện lan ra hàng
