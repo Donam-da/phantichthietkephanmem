@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { BookOpen, Clock, MapPin, User, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import { BookOpen, Clock, MapPin, User, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const Schedule = () => {
     const [schedule, setSchedule] = useState({});
@@ -9,6 +9,11 @@ const Schedule = () => {
     const [currentSemester, setCurrentSemester] = useState(null);
     const [currentWeekStart, setCurrentWeekStart] = useState(new Date());
     const [displayDays, setDisplayDays] = useState([]);
+    // State cho modal danh sách sinh viên
+    const [isStudentListModalOpen, setIsStudentListModalOpen] = useState(false);
+    const [selectedClassForStudentList, setSelectedClassForStudentList] = useState(null);
+    const [studentList, setStudentList] = useState([]);
+    const [isStudentListLoading, setIsStudentListLoading] = useState(false);
     // State mới cho lịch nhỏ
     const [calendarDate, setCalendarDate] = useState(new Date());
 
@@ -120,6 +125,7 @@ const Schedule = () => {
                             newSchedule[key] = [];
                         }
                         newSchedule[key].push({
+                            courseId: reg.course._id, // Thêm ID của lớp học phần
                             subjectName: reg.course.subject?.subjectName,
                             classCode: reg.course.classCode,
                             teacher: `${reg.course.teacher?.firstName} ${reg.course.teacher?.lastName}`,
@@ -137,6 +143,31 @@ const Schedule = () => {
             setLoading(false);
         }
     }, []);
+
+    const handleSlotClick = async (slot) => {
+        if (!slot || !slot.courseId) return;
+
+        setIsStudentListModalOpen(true);
+        setIsStudentListLoading(true);
+        setSelectedClassForStudentList(slot); // Lưu thông tin cơ bản của lớp
+
+        try {
+            const res = await api.get(`/api/registrations?course=${slot.courseId}&status=approved`);
+            setStudentList(res.data.registrations);
+        } catch (error) {
+            toast.error('Không thể tải danh sách sinh viên của lớp.');
+            console.error('Error fetching student list:', error);
+            setIsStudentListModalOpen(false); // Đóng modal nếu có lỗi
+        } finally {
+            setIsStudentListLoading(false);
+        }
+    };
+
+    const closeStudentListModal = () => {
+        setIsStudentListModalOpen(false);
+        setSelectedClassForStudentList(null);
+        setStudentList([]);
+    };
 
     const renderCalendar = () => {
         const month = calendarDate.getMonth();
@@ -259,7 +290,11 @@ const Schedule = () => {
                                                     {isWithinSemester && slots.length > 0 ? ( // Giữ lại dòng này
                                                         <div className="space-y-2">
                                                             {slots.map((slot, index) => (
-                                                                <div key={index} className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex flex-col h-[150px] overflow-hidden">
+                                                                <div 
+                                                                    key={index} 
+                                                                    className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex flex-col h-[150px] overflow-hidden cursor-pointer hover:bg-blue-100 hover:shadow-lg transition-all"
+                                                                    onClick={() => handleSlotClick(slot)}
+                                                                >
                                                                     {/* Tên môn học - chiếm 1/2 không gian */}
                                                                     <div className="flex items-start font-bold text-blue-800 h-1/2">
                                                                         <BookOpen size={14} className="mr-1.5" />
@@ -318,6 +353,60 @@ const Schedule = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Student List Modal */}
+            {isStudentListModalOpen && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div className="relative p-6 border w-full max-w-lg shadow-lg rounded-xl bg-white">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-900">Danh sách sinh viên</h3>
+                                <p className="text-sm text-gray-500">{selectedClassForStudentList?.subjectName} - {selectedClassForStudentList?.classCode}</p>
+                            </div>
+                            <button onClick={closeStudentListModal} className="p-1 rounded-full hover:bg-gray-200">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="max-h-[60vh] overflow-y-auto">
+                            {isStudentListLoading ? (
+                                <div className="flex justify-center items-center h-40">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                </div>
+                            ) : studentList.length > 0 ? (
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">STT</th>
+                                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã sinh viên</th>
+                                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Họ và Tên</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {studentList.map((registration, index) => (
+                                            <tr key={registration._id}>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">{registration.student?.studentId}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{registration.student?.firstName} {registration.student?.lastName}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <p className="text-center text-gray-500 py-10">Không có sinh viên nào trong lớp này.</p>
+                            )}
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={closeStudentListModal}
+                                className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
