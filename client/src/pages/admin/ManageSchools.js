@@ -190,9 +190,9 @@ const ManageSchools = () => {
                                 <th className="px-6 py-3 text-left">
                                     <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">STT</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã Trường</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Trường</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider w-16">STT</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Mã Trường</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Tên Trường</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">

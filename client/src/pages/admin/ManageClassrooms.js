@@ -15,6 +15,17 @@ const roomTypeNames = {
 // Moved outside component
 const getAuthHeaders = () => ({ headers: { 'x-auth-token': localStorage.getItem('token') } });
 
+// Helper function to format date as "HH:mm(dd/MM)"
+const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${hours}:${minutes}(${day}/${month})`;
+};
+
 const ManageClassrooms = () => {
     const [classrooms, setClassrooms] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -330,11 +341,11 @@ const ManageClassrooms = () => {
                                 <th className="px-6 py-3 text-left">
                                     <input type="checkbox" onChange={handleSelectAll} checked={isAllSelected} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">STT</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã phòng</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thông tin</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lịch khóa phòng</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider w-16">STT</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Mã phòng</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Thông tin</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-red-800 uppercase tracking-wider">Lịch khóa phòng</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider">Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -354,7 +365,12 @@ const ManageClassrooms = () => {
                                                 {room.scheduledEvents.map((event, index) => (
                                                     <li key={index} className="flex items-center text-xs">
                                                         <Clock size={12} className="mr-2 text-blue-500 flex-shrink-0" />
-                                                        <span className="text-gray-900 font-semibold">{new Date(event.deactivationTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} <ArrowRight size={10} className="inline-block mx-1 text-gray-500" /> {new Date(event.activationTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} {event.notes && <span className="text-gray-500 ml-2 italic font-normal">({event.notes})</span>}</span>
+                                                        <span className="font-bold">
+                                                            <span className="text-red-700">{formatDateTime(event.deactivationTime)}</span>
+                                                            <ArrowRight size={10} className="inline-block mx-1 text-gray-500" />
+                                                            <span className="text-green-600">{formatDateTime(event.activationTime)}</span>
+                                                            {event.notes && <span className="text-gray-500 ml-2 italic font-normal">({event.notes})</span>}
+                                                        </span>
                                                     </li>
                                                 ))}
                                             </ul>
